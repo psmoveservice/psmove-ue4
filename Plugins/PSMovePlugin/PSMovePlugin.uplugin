@@ -1,0 +1,21 @@
+{
+	"FileVersion" : 3,
+	
+	"FriendlyName" : "Playstation Move Plugin",
+	"Version" : 1,
+	"VersionName" : "1.0",
+	"CreatedBy" : "Chadwick Boulay",
+	"CreatedByURL" : "https://github.com/cboulay/psmove-ue4",
+	"EngineVersion" : "4.7.0",
+	"Description" : "Playstation Move input.",
+	"Category" : "Input.Controller",
+	"EnabledByDefault" : true,
+	
+	"Modules" :
+	[
+		{
+			"Name" : "PSMovePlugin",
+			"Type" : "Runtime"
+		}
+	]
+}
