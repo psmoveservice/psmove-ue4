@@ -75,15 +75,20 @@ namespace UnrealBuildTool.Rules
 		
 		public void LoadPsmoveapi(TargetInfo Target)
 		{
+            string PlatformString = "Mac";
 			if ((Target.Platform == UnrealTargetPlatform.Win64) || (Target.Platform == UnrealTargetPlatform.Win32))
 			{
-				string PlatformString = (Target.Platform == UnrealTargetPlatform.Win64) ? "Win64" : "Win32";
-				PublicAdditionalLibraries.Add(Path.Combine(LibraryPath, PlatformString, "libpsmoveapi_static.a"));
-				PublicAdditionalLibraries.Add(Path.Combine(LibraryPath, PlatformString, "libpsmoveapi_tracker_static.a"));
-			}
-			else if (Target.Platform == UnrealTargetPlatform.Mac){
-				
-			}
+				PlatformString = (Target.Platform == UnrealTargetPlatform.Win64) ? "Win64" : "Win32";
+            }
+            else if (Target.Platform == UnrealTargetPlatform.Mac){
+                PlatformString = "Mac";
+            }
+
+            PublicAdditionalLibraries.Add(Path.Combine(LibraryPath, PlatformString, "libpsmoveapi_static.a"));
+            PublicAdditionalLibraries.Add(Path.Combine(LibraryPath, PlatformString, "libpsmoveapi_tracker_static.a"));
+
+            //Macs load binaries slightly differently. Maybe need to use BinariesPath?
+
 		}
 	}
 }
