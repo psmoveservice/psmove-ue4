@@ -4,6 +4,8 @@
 
 #include "ModuleManager.h"
 
+class PSMoveDelegate;  // Forward declaration.
+//struct PSMoveData;  // Forward declaration.
 
 /**
  * The public interface to this module.  In most cases, this interface is only public to sibling modules 
@@ -34,4 +36,13 @@ public:
     {
         return FModuleManager::Get().IsModuleLoaded( "PSMovePlugin" );
     }
+
+    /**
+     * Public API, implemented in ../Private/FPSMovePlugin.cpp
+     * Preferred way of getting data is to subscribe to PSMoveDelegate class through inheritance.
+     */
+    virtual void SetDelegate(PSMoveDelegate* newDelegate) {};
+    virtual void RemoveDelegate(){};
+    virtual void PSMoveTick(float DeltaTime) {};
+    //virtual PSMoveData* LatestData(int deviceId) { return NULL; };
 };
