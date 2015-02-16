@@ -1,14 +1,3 @@
-Binaries/*
-Config/*
-Content/*
-Intermediate/*
-Media/*
-Saved/*
-Source/*
-TestPSMove.uproject
-TestPSMove.xcodeproj
-Plugins/PSMovePlugin/Binaries/*
-
 # Compiled Object files
 *.slo
 *.lo
