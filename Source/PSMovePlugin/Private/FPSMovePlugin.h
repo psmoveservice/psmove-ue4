@@ -4,7 +4,7 @@
  * The Unreal template plugins keep the header in PSMovePlugin.cpp
  * I prefer to have my header separate to implementation.
  */
-class DataCollector;  // Forward declaration. Fully declared in ...?
+class DataCollector;
 class PSMoveDelegate;  // Forward declaration. Fully declared in ...?
 
 class FPSMovePlugin : public IPSMovePlugin
