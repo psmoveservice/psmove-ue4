@@ -1,11 +1,7 @@
 #pragma once
 
-#include "Core.h"
-#include "Engine.h"
-#include "PSMoveDelegate.h"
 #include "PSMoveController.generated.h"
 
-/*
 UCLASS(ClassGroup = Input, meta=(BlueprintSpawnableComponent))
 class UPSMoveController : public UActorObject
 {
@@ -13,16 +9,17 @@ class UPSMoveController : public UActorObject
     GENERATED_UCLASS_BODY()
 
 public:
+    
+    ~UPSMoveController();
+    virtual void OnRegister() override;
+    virtual void OnUnregister() override;
+    virtual void TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction *ThisTickFunction) override;
 
-    //orientation in rotator format
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "PSMove")
-    FRotator orientation;
-
-    //Conversion
-    void setFromPSMoveData(PSMoveData* data);
+    UFUNCTION(BlueprintCallable, meta = (FriendlyName = "setDelegate", CompactNodeTitle = "", Keywords = "set delegate self"), Category = "PSMove Interface")
+    void SetInterfaceDelegate(UObject* newDelegate);
 
 private:
-    PSMoveDelegate* _psmoveDelegate;
+    class PSMoveControllerPrivate* _private;
+    void InterfaceEventTick(float DeltaTime);
 
 };
-*/
