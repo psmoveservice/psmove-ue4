@@ -1,54 +1,21 @@
+//
+//  PSMovePluginDelegate.cpp
+//  TestPSMove
+//
+//  Created by Chadwick Boulay on 2015-02-17.
+//  Copyright (c) 2015 EpicGames. All rights reserved.
+//
+
 #include "PSMovePluginPrivatePCH.h"
 #include "PSMoveDelegate.h"
-#include "IPSMovePlugin.h"
-/* Already in PrivatePCH 
-#include "IPSMovePlugin.h"
-#include "PSMoveDelegate.h"
-*/
+#include "IPSMovePlugin.h" // Necessary to call its PSMoveSetDelegate and PSMoveTick
 
-//DEFINE_LOG_CATEGORY(PSMovePluginLog);
+// Empty event emitters.
 
-//Input Mapping EKey definitions
+    //void PSMovePluginDelegate::PSMoveOn6DOFData(int32 deviceId, uint64 timestamp, FQuat quat){}
+    //void PSMovePluginDelegate::PSMoveOn6DOFData(int32 deviceId, uint64 timestamp, FRotator rot){}
 
-//Empty Implementations
-void PSMoveOnConnect(int32 deviceId, uint64 timestamp){}
-void PSMoveOnDisconnect(int32 deviceId, uint64 timestamp){}
-void PSMoveOnPair(int32 deviceId, uint64 timestamp){}
-void PSMoveOnUnpair(int32 deviceId, uint64 timestamp){}
-void PSMoveOnData(int32 deviceId, uint64 timestamp, FQuat quat){}
-void PSMoveOnData(int32 deviceId, uint64 timestamp, FRotator rot){}
-
-void PSMoveDisabled(){}
-
-/*
-PSMoveData* PSMoveDelegate::PSMoveLatestData(int32 myoId)
-{
-    if (IPSMovePlugin::IsAvailable())
-    {
-        return IPSMovePlugin::Get().LatestData(myoId);
-    }
-    return NULL;
-}
-*/
-
-/*
-void PSMoveDelegate::PSMoveLatestData(int32 myoId, int32& Pose, FVector& Acceleration, FRotator& Orientation, FVector& Gyro,
-                    int32& Arm, int32& xDirection,
-                    FVector& ArmAcceleration, FRotator& ArmOrientation, FVector& ArmGyro, FRotator& ArmCorrection,
-                    FVector& BodySpaceAcceleration){
-
-    PSMoveData data = *PSMoveLatestData(myoId);
-}
-*/
-
-
-void PSMoveDelegate::PSMoveTick(float DeltaTime)
-{
-    if (IPSMovePlugin::IsAvailable())
-    {
-        IPSMovePlugin::Get().PSMoveTick(DeltaTime);
-    }
-}
+    // Required functions
 void PSMoveDelegate::PSMoveStartup()
 {
     if (IPSMovePlugin::IsAvailable())
@@ -56,11 +23,14 @@ void PSMoveDelegate::PSMoveStartup()
         IPSMovePlugin::Get().SetDelegate((PSMoveDelegate*)this);
     }
 }
-
 void PSMoveDelegate::PSMoveShutdown()
+{
+    
+}
+void PSMoveDelegate::PSMoveTick(float DeltaTime)
 {
     if (IPSMovePlugin::IsAvailable())
     {
-        IPSMovePlugin::Get().RemoveDelegate();
+        IPSMovePlugin::Get().PSMoveTick(DeltaTime);
     }
 }

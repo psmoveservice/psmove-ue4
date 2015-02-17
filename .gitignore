@@ -1,4 +1,5 @@
 Binaries/*
+.fuse*
 
 # Compiled Object files
 *.slo

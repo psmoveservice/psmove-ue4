@@ -47,11 +47,11 @@ namespace UnrealBuildTool.Rules
             PublicDependencyModuleNames.AddRange(
                 new string[]
                 {
-                    "Engine",
+                    "Engine",               // Used by Actor
                     "Core",
-                    "CoreUObject",
-                    "InputCore",
-                    "HeadMountedDisplay"
+                    "CoreUObject",          // Actors and Structs
+                    "InputCore",            // Provides LOCTEXT and other Input features
+                    "HeadMountedDisplay"    // Eventually we may want to have the plugin contain its own calibration methods.
                     // ... add other public dependencies that you statically link with here ...
                 }
             );
@@ -73,23 +73,28 @@ namespace UnrealBuildTool.Rules
             LoadPsmoveapi(Target);
         }
 
-        public void LoadPsmoveapi(TargetInfo Target)
+        public bool LoadPsmoveapi(TargetInfo Target)
         {
+            bool isLibrarySupported = false;
             string PlatformString = "Mac";
             if ((Target.Platform == UnrealTargetPlatform.Win64) || (Target.Platform == UnrealTargetPlatform.Win32))
             {
+                isLibrarySupported = true;
                 PlatformString = (Target.Platform == UnrealTargetPlatform.Win64) ? "Win64" : "Win32";
             }
             else if (Target.Platform == UnrealTargetPlatform.Mac)
             {
+                isLibrarySupported = true;
                 PlatformString = "Mac";
+                //Macs load binaries slightly differently. Maybe need to use BinariesPath?
             }
 
-            PublicAdditionalLibraries.Add(Path.Combine(LibraryPath, PlatformString, "libpsmoveapi_static.a"));
-            PublicAdditionalLibraries.Add(Path.Combine(LibraryPath, PlatformString, "libpsmoveapi_tracker_static.a"));
-
-            //Macs load binaries slightly differently. Maybe need to use BinariesPath?
-
+            if (isLibrarySupported)
+            {
+                PublicAdditionalLibraries.Add(Path.Combine(LibraryPath, PlatformString, "libpsmoveapi_static.a"));
+                PublicAdditionalLibraries.Add(Path.Combine(LibraryPath, PlatformString, "libpsmoveapi_tracker_static.a"));
+            }
+            return isLibrarySupported;
         }
     }
 }

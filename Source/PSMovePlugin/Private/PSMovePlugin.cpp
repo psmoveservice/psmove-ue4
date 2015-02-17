@@ -1,63 +1,42 @@
-#include "PSMovePluginPrivatePCH.h"
+#include "PSMovePluginPrivatePCH.h"  // Also includes psmove api lib headers.
 
-#include "FPSMovePlugin.h"  // Includes IPSMovePlugin.h
-//#include "PSMoveDelegate.h"
-#include "psmove.h"
-#include "psmove_tracker.h"
-#include "psmove_fusion.h"
+#include "IPSMovePlugin.h"
+#include "FPSMovePlugin.h"
+
+#include "PSMoveDelegate.h"  // Previously forward-declared.
 
 IMPLEMENT_MODULE( FPSMovePlugin, PSMovePlugin )
-
-#define LOCTEXT_NAMESPACE "PSMovePlugin"
-
-class DataCollector
-{
-public:
-    DataCollector()
-    {
-
-    }
-
-    ~DataCollector()
-    {
-
-    }
-
-    void ConvertAllData()
-    {
-
-    }
-};
+DEFINE_LOG_CATEGORY_STATIC(LogPSMovePlugin, Log, All);
 
 void FPSMovePlugin::StartupModule()
 {
     // This code will execute after your module is loaded into memory (but after global variables are initialized, of course.)
 
-    //UE_LOG(PSMovePluginLog, Log, TEXT("Loaded PSMove Plugin"));
+    UE_LOG(LogPSMovePlugin, Log, TEXT("Loaded PSMove plugin"));
 
-    collector = new DataCollector;
+    psmoveDelegate = NULL;
+
+    // Do we need to do anything to load the library before actually calling it?
+    // We do not want to connect yet.
+
 }
-
 
 void FPSMovePlugin::ShutdownModule()
 {
     // This function may be called during shutdown to clean up your module.  For modules that support dynamic reloading,
     // we call this function before unloading the module.
+
+    // If we had to do any work to load the library in StartupModule, we would undo that work here.
+    // UE_LOG(LogPSMovePlugin, Log, TEXT("Shutdown PSMove plugin."));
 }
 
-/* Public API Implementation */
-/*
-PSMoveData* FPSMovePlugin::LatestData(int deviceId)
-{
-
-}
-*/
-
+/** Public API Implementation **/
 
 void FPSMovePlugin::SetDelegate(PSMoveDelegate* newDelegate){
-    //UE_LOG(PSMovePluginLog, Log, TEXT("PSMove Delegate Set (should only be called once per begin play)."));
     psmoveDelegate = newDelegate;
+    UE_LOG(LogPSMovePlugin, Log, TEXT("PSMove delegate set. (should only appear once)"));
 
+    // Connect and configure the device.
     //See https://github.com/cboulay/psmoveapi/blob/master/examples/c/test_opengl3.cpp
     //PSMove **moves = psmove_connect_by_id(int id);
     //PSMoveTracker *m_tracker;
@@ -74,39 +53,38 @@ void FPSMovePlugin::SetDelegate(PSMoveDelegate* newDelegate){
 
 void FPSMovePlugin::RemoveDelegate()
 {
-
+    UE_LOG(LogPSMovePlugin, Log, TEXT("PSMove delegate removed."));
 }
 
 void FPSMovePlugin::PSMoveTick(float DeltaTime)
 {
-    // Get the freshest data.
+    // Get the data
 
-    // Convert and pass the data to the delegate
-    collector->ConvertAllData();
+    /*
+     Vector3D pos;
+     DelegateTick(DeltaTime);
+     if (psmove_poll(m_moves[i]))
+     {
+     psmove_fusion_get_position(m_fusion, m_moves[i],
+     &(pos.x), &(pos.y), &(pos.z));
+     int buttons = psmove_get_buttons(m_moves[i]);
+     }
+     psmove_tracker_update(m_tracker, NULL);
+     */
+    
+    // Reformat and pass the data to the delegate.
 
     // Call the delegate
     if (psmoveDelegate != NULL)
     {
-        /*
-        Vector3D pos;
         DelegateTick(DeltaTime);
-        if (psmove_poll(m_moves[i]))
-        {
-            psmove_fusion_get_position(m_fusion, m_moves[i],
-                &(pos.x), &(pos.y), &(pos.z));
-            int buttons = psmove_get_buttons(m_moves[i]);
-        }
-        psmove_tracker_update(m_tracker, NULL);
-        */
     }
 }
 
 void FPSMovePlugin::DelegateTick(float DeltaTime)
 {
-    // Update data history
 
     // Trigger any delegate events
 
-}
 
-#undef LOCTEXT_NAMESPACE
+}

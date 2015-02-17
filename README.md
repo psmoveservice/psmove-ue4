@@ -1,30 +1,31 @@
 # psmove-ue4
 Plugin for using PSMove as input into Unreal Engine 4.
 
-Clone into <My_Project>/Plugins/ and rename folder to PSMovePlugin.
-
 # User Notes
+
+Change to your project directory (must be a project with C++ code).
+`mkdir Plugins`
+`cd Plugins`
+`git clone https://github.com/cboulay/psmove-ue4.git`
+`mv psmove-ue4 PSMovePlugin`
+Then refresh your code.
 
 # Developer Notes
 
-I am very new to UE4 programming. Much of what I write below may be wrong, but the process helps me learn.
+## Bottom-Up
 
 `PSMovePlugin.uplugin` defines a module named `PSMovePlugin`.
 
-`PSMovePlugin.Build.cs` defines the Public and Private include paths.
+`PSMovePlugin.Build.cs` defines the Public and Private include paths and links the psmoveapi libraries.
 
-I can only imagine what happens next. The build tool must search the public and private include paths for `IMPLEMENT_MODULE( FPSMovePlugin, PSMovePlugin )`.
+(I think) The build tool searches the public and private include paths for `IMPLEMENT_MODULE( FPSMovePlugin, PSMovePlugin )`. With that identified, we know that the implementation of the `PSMovePlugin` module can be found in the `FPSMovePlugin` class.
 
-With that identified, we know that the implementation of the PSMovePlugin module can be found in the FPSMovePlugin class.
+This class (declared in `Private/FPSMovePlugin.h < Public/IPSMovePlugin.h`; defined in `Private/FPSMovePlugin.cpp`), defines `SetDelegate(PSMoveDelegate*)`, `PSMoveTick` (poll for the latest data then calls…), and `DelegateTick`.
 
-`FPSMovePlugin` is declared in two stages: `Public/IPSMovePlugin.h` and `Private/FPSMovePlugin.h`
-`FPSMovePlugin` implementation is in `Private/FPSMovePlugin.cpp`
 
-`Public/IPSMovePlugin.h` declares the virtual functions `SetDelegate()` and `PSMoveTick(float DeltaTime)`.
-`Private/FPSMovePlugin.h` declares class `DataCollector`, functions `StartupModule()`, and `ShutdownModule()`,
-the previously virtual functions `SetDelegate(PSMoveDelegate* newDelegate)` and `PSMoveTick(float DeltaTime)`,
-private member variables `collector` and `psmoveDelegate`,
-and private functions `DelegateTick(float DeltaTime)` and `DelegateUpdateAllData`.
 
-The implementation, `Private/FPSMovePlugin.cpp`, is where all the work happens.
-The above classes and functions are all defined here.
+## Top-Down
+
+We need a PlayerController that we can use to control a pawn.
+To do this, we create `APSMovePlayerController`, which inherits from `APlayerController` and others that inherit from `PSMoveDelegate`. The `APSMovePlayerController` defines virtual functions `BeginPlay()`, `EndPlay(const EEndPlayReason::Type EndPlayReason)`, and `Tick(DeltaTime)`. Each of these calls their `Super`, and then the PSMove-specific functions (`PSMoveStartup`, `PSMoveShutdown`, `PSMoveTick`) defined by `PSMoveDelegate`.
+

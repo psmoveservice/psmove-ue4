@@ -4,28 +4,25 @@
  * The Unreal template plugins keep the header in PSMovePlugin.cpp
  * I prefer to have my header separate to implementation.
  */
-class DataCollector;
-class PSMoveDelegate;  // Forward declaration. Fully declared in ...?
+
+class PSMoveDelegate;  // Forward declaration.
 
 class FPSMovePlugin : public IPSMovePlugin
 {
 public:
     /** IModuleInterface implementation */
-    void StartupModule();
-    void ShutdownModule();
+    void StartupModule(); // Automatically called on module load.
+    void ShutdownModule(); // Automatically called on module unload.
 
-    /** Delegate method to subscribe to event calls, only supports one listener */
+    
+    /** Delegate method to subscribe to event calls */
     void SetDelegate(PSMoveDelegate* newDelegate);
     void RemoveDelegate();
-
-    /** Manual looping, currently called in main thread. */
-    void PSMoveTick(float DeltaTime);
-
-    /** Optional public API for direct module bind */
-    //PSMoveData* LatestData(int deviceId);
+    /** Manual looping. Call this in class Tick. */
+     void PSMoveTick(float DeltaTime);
 
 private:
-    DataCollector *collector;
+
     PSMoveDelegate* psmoveDelegate;
 
     void DelegateTick(float DeltaTime);

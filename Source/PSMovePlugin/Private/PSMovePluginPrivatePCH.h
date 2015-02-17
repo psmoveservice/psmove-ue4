@@ -1,7 +1,8 @@
 // Copyright 1998-2015 Epic Games, Inc. All Rights Reserved.
-#include "Core.h"
+
 #include "Engine.h"
 #include "CoreUObject.h"
+
 #include "../../ThirdParty/psmoveapi/include/psmove.h"
 #include "../../ThirdParty/psmoveapi/include/psmove_fusion.h"
 #include "../../ThirdParty/psmoveapi/include/psmove_tracker.h"
