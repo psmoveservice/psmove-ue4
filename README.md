@@ -5,13 +5,30 @@ DO NOT USE! IT DOES NOT WORK!
 # User Notes
 
 Change to your project directory (must be a project with C++ code).
-`mkdir Plugins`
-`cd Plugins`
-`git clone https://github.com/cboulay/psmove-ue4.git`
-`mv psmove-ue4 PSMovePlugin`
+
+```
+mkdir Plugins
+cd Plugins
+git clone https://github.com/cboulay/psmove-ue4.git
+mv psmove-ue4 PSMovePlugin
+```
+
 Then refresh your code.
 
 # Developer Notes
+
+We first create an interface class. This class is decorated with the
+[UINTERFACE macro](https://docs.unrealengine.com/latest/INT/Programming/UnrealArchitecture/Reference/Interfaces/index.html)
+and inherits from [IModuleInterface](https://docs.unrealengine.com/latest/INT/API/Runtime/Core/Modules/IModuleInterface/index.html).
+
+We then inherit from the interface within the plugin's private implementation.
+The game can now consume the plugin through the interface.
+
+<aside class="notice">
+In some cases (I'm not sure, [but when a UObject is involved anyway](https://answers.unrealengine.com/questions/2649/how-exactly-do-game-plugins-work.html))
+it will be necessary to use [MYMODULE_API -style interface](https://answers.unrealengine.com/questions/2649/how-exactly-do-game-plugins-work.html).
+</aside>
+
 
 As far as I can tell, there are [two ways](https://answers.unrealengine.com/questions/2649/how-exactly-do-game-plugins-work.html) to design Plugins for use in the game.
 
