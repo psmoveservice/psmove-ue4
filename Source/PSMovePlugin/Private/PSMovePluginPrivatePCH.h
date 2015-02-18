@@ -5,7 +5,6 @@
 
 #include "Engine.h"
 #include "CoreUObject.h"
-#include "PSMoveDelegate.h"  // Needed by most cpp files. Also defines LOG.
 
 #include "../../ThirdParty/psmoveapi/include/psmove.h"
 #include "../../ThirdParty/psmoveapi/include/psmove_fusion.h"
