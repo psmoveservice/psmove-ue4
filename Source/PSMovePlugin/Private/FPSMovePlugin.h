@@ -1,5 +1,6 @@
 #pragma once
 #include "IPSMovePlugin.h"
+
 /**
  * The Unreal template plugins keep the header in PSMovePlugin.cpp
  * I prefer to have my header separate to implementation.

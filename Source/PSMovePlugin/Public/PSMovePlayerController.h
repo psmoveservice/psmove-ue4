@@ -7,14 +7,16 @@
 //
 #pragma once
 
-#include "GameFramework/PlayerController.h"
-#include "PSMoveDelegate.h"
+#include "GameFramework/PlayerController.h"  // Inherited from here
+#include "PSMoveDelegate.h"  // Inherited from here too
 #include "PSMovePlayerController.generated.h"
 
 UCLASS()
 class APSMovePlayerController : public APlayerController, public PSMoveDelegate
 {
     GENERATED_UCLASS_BODY()
+
+    void PSMoveOn6DOFData(int32 deviceId, uint64 timestamp, FVector pos, FQuat quat) override;
 
     virtual void BeginPlay() override;
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;

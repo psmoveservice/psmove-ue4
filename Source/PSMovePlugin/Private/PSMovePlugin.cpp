@@ -3,10 +3,7 @@
 #include "IPSMovePlugin.h"
 #include "FPSMovePlugin.h"
 
-#include "PSMoveDelegate.h"  // Previously forward-declared.
-
 IMPLEMENT_MODULE( FPSMovePlugin, PSMovePlugin )
-DEFINE_LOG_CATEGORY_STATIC(LogPSMovePlugin, Log, All);
 
 void FPSMovePlugin::StartupModule()
 {
@@ -58,6 +55,7 @@ void FPSMovePlugin::RemoveDelegate()
 
 void FPSMovePlugin::PSMoveTick(float DeltaTime)
 {
+    UE_LOG(LogPSMovePlugin, Log, TEXT("FPSMovePlugin::PSMoveTick"));
     // Get the data
 
     /*
@@ -84,6 +82,7 @@ void FPSMovePlugin::PSMoveTick(float DeltaTime)
 void FPSMovePlugin::DelegateTick(float DeltaTime)
 {
 
+    UE_LOG(LogPSMovePlugin, Log, TEXT("FPSMovePlugin::DelegateTick"));
     // Trigger any delegate events
 
 
