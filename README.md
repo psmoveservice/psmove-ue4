@@ -24,8 +24,7 @@ Technically, this is more of an 'abstract' class because it does have two implem
 This abstract class defines one or more virtual functions (Leap plugin defines a virtual class).
 
 This class is implemented by `FPSMovePlugin` (Private/FPSMovePlugin.h|cpp).
-In the header, it is necessary to declare previously abstract-functions (`virtual TYPE FUNC() override;` vs normal declaration?).
-Two functions that you definitely need to declare are `void StartupModule();` and `void ShutdownModule();`, previously defined in IModuleInterface, which are called on module load (e.g., opening editor) and shutdown, respectively.
+In the header, it is necessary to declare `void StartupModule();` and `void ShutdownModule();`, previously declared virtual in IModuleInterface.
 
 In the definition (FPSMovePlugin.cpp), we have to call `IMPLEMENT_MODULE(FPSMovePlugin, PSMovePlugin), which is an alias to DLLEXPORT the initialization of this module.
 
@@ -33,4 +32,3 @@ That is the bare minimum for a plugin.
 
 ## Adding functionality
 
-To Do.
