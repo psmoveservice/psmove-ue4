@@ -1,4 +1,4 @@
-
+Start from [here](https://github.com/karolz/PluginCreator).
 
 
 (example)[https://github.com/cboulay/psmoveapi/blob/master/examples/c/test_opengl3.cpp]
@@ -32,7 +32,7 @@ One convenient way to have your Plugin functions used by the game is through eve
 
 (I think) The build tool searches the public and private include paths for `IMPLEMENT_MODULE( FPSMovePlugin, PSMovePlugin )`. With that identified, we know that the implementation of the `PSMovePlugin` module can be found in the `FPSMovePlugin` class.
 
-This class (declared in `Private/FPSMovePlugin.h, inherits from Public/IPSMovePlugin.h`, necessarily inherits from `IModuleInterface`; implemented in `Private/FPSMovePlugin.cpp`), defines `SetDelegate(PSMoveDelegate*)`, `PSMoveTick` (poll for the latest data then calls…), and `DelegateTick`.
+This class (declared in `Private/FPSMovePlugin.h, inherits from Public/IPSMovePlugin.h`, necessarily inherits from `IModuleInterface`; implemented in `Private/FPSMovePlugin.cpp`), defines `SetDelegate(PSMoveDelegate*)`, `PSMoveTick` (poll for the latest data then callsâ€¦), and `DelegateTick`.
 
 
 
