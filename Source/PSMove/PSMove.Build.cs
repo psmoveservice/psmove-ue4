@@ -4,7 +4,7 @@ using System.IO;
 
 namespace UnrealBuildTool.Rules
 {
-    public class PSMovePlugin : ModuleRules
+    public class PSMove : ModuleRules
     {
 
         private string ModulePath
@@ -27,18 +27,19 @@ namespace UnrealBuildTool.Rules
             get { return Path.GetFullPath(Path.Combine(ThirdPartyPath, "psmoveapi", "lib")); }
         }
 
-        public PSMovePlugin(TargetInfo Target)
+        public PSMove(TargetInfo Target)
         {
             PublicIncludePaths.AddRange(
                 new string[] {
-                    "PSMovePlugin/Public",
+                    "PSMove/Public",
+                    "PSMove/Classes",
                     // ... add public include paths required here ...
                 }
             );
 
             PrivateIncludePaths.AddRange(
                 new string[] {
-                    "PSMovePlugin/Private",
+                    "PSMove/Private",
                     Path.Combine(ThirdPartyPath, "psmoveapi", "include"),
                     // ... add other private include paths required here ...
                 }

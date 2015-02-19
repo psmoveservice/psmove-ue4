@@ -1,12 +1,12 @@
 #pragma once
-#include "IPSMovePlugin.h"
+#include "IPSMove.h"
 
 /**
- * The Unreal template plugins keep the header in PSMovePlugin.cpp
- * I prefer to have my header separate to implementation.
+ * The Unreal template plugins keep the header in FPSMove.cpp
+ * I prefer to have my header separate to definitions.
  */
 
-class FPSMovePlugin : public IPSMovePlugin
+class FPSMove : public IPSMove
 {
 public:
     /** IModuleInterface implementation */

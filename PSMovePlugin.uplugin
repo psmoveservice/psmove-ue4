@@ -14,7 +14,7 @@
 	"Modules" :
 	[
 		{
-			"Name" : "PSMovePlugin",
+			"Name" : "PSMove",
 			"Type" : "Runtime"
 		}
 	]

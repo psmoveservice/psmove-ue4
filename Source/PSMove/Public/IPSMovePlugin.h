@@ -4,13 +4,13 @@
 
 #include "ModuleManager.h"
 
-DEFINE_LOG_CATEGORY_STATIC(LogPSMovePlugin, Log, All);
+DEFINE_LOG_CATEGORY_STATIC(LogPSMove, Log, All);
 
 /**
  * The public interface to this module.  In most cases, this interface is only public to sibling modules 
  * within this plugin.
  */
-class IPSMovePlugin : public IModuleInterface
+class IPSMove : public IModuleInterface
 {
 
 public:
@@ -21,9 +21,9 @@ public:
      *
      * @return Returns singleton instance, loading the module on demand if needed
      */
-    static inline IPSMovePlugin& Get()
+    static inline IPSMove& Get()
     {
-        return FModuleManager::LoadModuleChecked< IPSMovePlugin >( "PSMovePlugin" );
+        return FModuleManager::LoadModuleChecked< IPSMove >( "PSMove" );
     }
 
     /**
@@ -33,7 +33,7 @@ public:
      */
     static inline bool IsAvailable()
     {
-        return FModuleManager::Get().IsModuleLoaded( "PSMovePlugin" );
+        return FModuleManager::Get().IsModuleLoaded( "PSMove" );
     }
 
 };

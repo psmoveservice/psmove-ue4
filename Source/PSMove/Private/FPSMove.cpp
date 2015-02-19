@@ -1,15 +1,15 @@
-#include "PSMovePluginPrivatePCH.h"  // Also includes psmove api lib headers.
+#include "PSMovePrivatePCH.h"  // Also includes psmove api lib headers.
 
-#include "IPSMovePlugin.h"
-#include "FPSMovePlugin.h"
+#include "IPSMove.h"
+#include "FPSMove.h"
 
-IMPLEMENT_MODULE( FPSMovePlugin, PSMovePlugin )
+IMPLEMENT_MODULE( FPSMove, PSMove )
 
-void FPSMovePlugin::StartupModule()
+void FPSMove::StartupModule()
 {
     // This code will execute after your module is loaded into memory (but after global variables are initialized, of course.)
 
-    UE_LOG(LogPSMovePlugin, Log, TEXT("Loaded PSMove plugin"));
+    UE_LOG(LogPSMove, Log, TEXT("Loaded PSMove module."));
 
 }
 
@@ -19,5 +19,5 @@ void FPSMovePlugin::ShutdownModule()
     // we call this function before unloading the module.
 
     // If we had to do any work to load the library in StartupModule, we would undo that work here.
-    // UE_LOG(LogPSMovePlugin, Log, TEXT("Shutdown PSMove plugin."));
+    // UE_LOG(LogPSMove, Log, TEXT("Shutdown PSMove module."));
 }
