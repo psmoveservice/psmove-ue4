@@ -13,6 +13,10 @@ public:
     void StartupModule(); // Automatically called on module load.
     void ShutdownModule(); // Automatically called on module unload.
 
+    /** IPSMove implementation */
+    void MoveSetup();  // Activate the device. Turn on the tracker. Setup fusion.
+    void MoveUnset();  // Deactivate the device. Turn off the tracker. Unset fusion.
+    void MoveTick(float DeltaTime);  // (V1) Polls device. Calculates position and orientation. Fires events.
 private:
 
 };

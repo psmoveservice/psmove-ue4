@@ -36,4 +36,13 @@ public:
         return FModuleManager::Get().IsModuleLoaded( "PSMove" );
     }
 
+    /**
+     * Here we declare functions that will be used to access the module instance from within the game.
+     * These functions are used to setup/unset the module (device activation),
+     * to tick the module (device poll), etc.
+     * Implemented in Private/FPSMove.cpp
+     */
+    virtual void MoveSetup(){};
+    virtual void MoveUnset(){};
+    virtual void MoveTick(float DeltaTime){};
 };

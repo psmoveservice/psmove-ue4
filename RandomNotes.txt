@@ -1,7 +1,44 @@
-Start from [here](https://github.com/karolz/PluginCreator).
-
-
 (example)[https://github.com/cboulay/psmoveapi/blob/master/examples/c/test_opengl3.cpp]
+
+Next, we need a way for the module to trigger events to let the game know that something happened. Event messaging is typically complicated, and UE4 is no exception.
+
+
+### Interfaces
+
+Interfaces can be Blueprint interfaces as well as defined in C++. We need C++ because we are accessing a C++ library (i.e., the psmoveapi). See the [UE4 Wiki tutorial on C++ interfaces](https://wiki.unrealengine.com/Interfaces_in_C%2B%2B). Also [here](https://answers.unrealengine.com/questions/152680/interface-in-c-can-you-pass-variables-between-obje.html).
+
+#### Defining an interface in C++
+
+See Source/Public/PSMoveEventInterface.h and Souce/Private/PSMoveEventInterface.cpp 
+
+In our interface header we declare static member variables and static functions.
+
+#### Implementing an interface in C++
+
+(Multiply-) Inherit from the interface in a C++ class. Here I do that in Source/Classes/PSMoveComponent.h
+
+
+There needs to be a mechanism to communicate between our module's functionality and the created class. As far as I can tell, there are two ways to do this, and neither of them are very well documented:
+
+1. UE4's delegate system
+2. Interfaces
+
+### UE4's delegate system
+
+I have not worked much with [UE4's delegate system](https://docs.unrealengine.com/latest/INT/Programming/UnrealArchitecture/Delegates/index.html), though I hope to try it eventually.
+
+
+
+
+
+#### Defining an interface in Blueprints
+
+We are not doing this here, though it is [well documented](https://docs.unrealengine.com/latest/INT/Engine/Blueprints/UserGuide/Types/Interface/index.html).
+
+#### Implementing an interface in Blueprint
+
+This is probably the [best-documented part of interfaces](https://docs.unrealengine.com/latest/INT/Engine/Blueprints/UserGuide/Types/Interface/UsingInterfaces/index.html).
+
 
 
 This class is decorated with the
