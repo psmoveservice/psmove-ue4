@@ -7,5 +7,5 @@
 #include "CoreUObject.h"
 
 #include "../../ThirdParty/psmoveapi/include/psmove.h"
-#include "../../ThirdParty/psmoveapi/include/psmove_fusion.h"
 #include "../../ThirdParty/psmoveapi/include/psmove_tracker.h"
+    //#include "../../ThirdParty/psmoveapi/include/psmove_fusion.h"

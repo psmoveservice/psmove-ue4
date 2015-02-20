@@ -13,14 +13,12 @@ git clone https://github.com/cboulay/psmove-ue4.git
 mv psmove-ue4 PSMovePlugin
 ```
 
-Then refresh your code and build your project.
+Then refresh your code (in winows, right click on .uproject; in Mac, do from within editor) and build your project.
 
-In your game, open the Actor you want to have PSMove input from. Add the PSMoveComponent to the actor.
+In your game, open the Actor you want to have PSMove input from. Add the PSMove component to the actor.
 Then... (in progress)
 
 # Developer Notes
-
-These notes are my notes taken during plugin development. They will help you understand how I developed it, which should help you understand how to modify/extend it.
 
 ## Bare Minimum
 
@@ -28,7 +26,7 @@ See here for a definition of a [UE4 Plugin](https://docs.unrealengine.com/latest
 
 The steps to create a minimal plugin are a bit tedious. See [here for a tool](https://github.com/karolz/PluginCreator) that automates this process.
 
-First, we define our plugin's module(s) and list them in the plugin descriptor: `<PluginName>.uplugin`. We only have one module: `<ModuleName>`. Next, we create a Source/<ModuleName> folder for each of our modules.
+First, we define our plugin's module(s) and list them in the plugin descriptor: `PSMovePlugin.uplugin`. We only have one module: `PSMove`. Next, we create a Source/<ModuleName> folder for each of our modules.
 
 In each module folder we have its <ModuleName>.Build.cs that describes how to build it. There we define the include directories and the libraries (and other modules) we will link. 
 
@@ -38,7 +36,15 @@ That is the bare minimum for a plugin.
 
 ## Adding functionality
 
-I provide an example C++ class UPSMoveComponent, subclassing UActorComponent. You may use or inherit directly from this class. Alternatively, you may create your own C++ or blueprint class in your game based on this example.
+The desired end result is an in-game class that can use Blueprints to access the module's functions. I provide an example C++ class UPSMoveComponent, subclassing UActorComponent, that has this ability. You may use or inherit directly from this class, or use it as a template to build your own C++ or Blueprint class.
+
+The FPSMove (i.e., module singleton), upon startup, initializes the FPSMoveWorker passing pointers to the module's MyPosition and MyOrientation members.
+The FPSMoveWorker's PSMoveWorkerInit function constructs a static FPSMoveWorker instance (relaying pointers to MyPosition and MyOrientation).
+Upon construction of the FPSMoveWorker instance, MyPosition and MyOrientation pointers are copied to local member pointers WorkerPosition and WorkerOrientation. Then the worker Thread is created, the PSMove controllers are connected and the tracker is initialized. The trail ends here. We need a way to Init() and Run() the worker.
+
+
+
+
 
 Right now this component, when it ticks, tells the device to update its data and log it. This instruction is enabled through inheritance of an abstract class called IPSMoveAbstract that communicates with the module via its singleton (e.g., `IModule::Get().ModuleTick`);  TODO: Rename this IPSMoveWrapper, because it wraps the module in an interface.
 

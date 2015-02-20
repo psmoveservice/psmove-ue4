@@ -14,7 +14,6 @@ class IPSMove : public IModuleInterface
 {
 
 public:
-
     /**
      * Singleton-like access to this module's interface.  This is just for convenience!
      * Beware of calling this during the shutdown phase, though.  Your module might have been unloaded already.
@@ -38,11 +37,7 @@ public:
 
     /**
      * Here we declare functions that will be used to access the module instance from within the game.
-     * These functions are used to setup/unset the module (device activation),
-     * to tick the module (device poll), etc.
      * Implemented in Private/FPSMove.cpp
      */
-    virtual void MoveSetup(){};
-    virtual void MoveUnset(){};
-    virtual void MoveTick(float DeltaTime){};
+    virtual void CopyPQ(FVector& InPosition, FQuat& InOrientation) const{};
 };

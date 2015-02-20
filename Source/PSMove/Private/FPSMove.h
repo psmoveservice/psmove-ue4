@@ -16,15 +16,9 @@ public:
     void StartupModule(); // Automatically called on module load.
     void ShutdownModule(); // Automatically called on module unload.
 
+    FVector ModulePosition;
+    FQuat ModuleOrientation;
+
     /** IPSMove implementation */
-    void MoveSetup();  // Activate the device. Turn on the tracker. Setup fusion.
-    void MoveUnset();  // Deactivate the device. Turn off the tracker. Unset fusion.
-    void MoveTick(float DeltaTime);  // (V1) Polls device. Calculates position and orientation. Fires events.
-
-    int m_move_count;
-    PSMove **m_moves;
-    PSMoveTracker *m_tracker;
-    PSMoveFusion *m_fusion;
-
-private:
+    void CopyPQ(FVector& InPosition, FQuat& InOrientation) const;
 };
