@@ -84,7 +84,9 @@ namespace UnrealBuildTool.Rules
                 PlatformString = (Target.Platform == UnrealTargetPlatform.Win64) ? "Win64" : "Win32";
                 PublicAdditionalLibraries.Add(Path.Combine(LibraryPath, PlatformString, "libpsmoveapi_static.a"));
                 PublicAdditionalLibraries.Add(Path.Combine(LibraryPath, PlatformString, "libpsmoveapi_tracker_static.a"));
-
+                //FPlatformProcess::PushDllDirectory() ???
+                //FPlatformProcess::GetDllHandle() ???
+                //PublicDelayLoadDLLs ???
             }
             else if (Target.Platform == UnrealTargetPlatform.Mac)
             {

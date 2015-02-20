@@ -40,10 +40,6 @@ That is the bare minimum for a plugin.
 
 I provide an example C++ class UPSMoveComponent, subclassing UActorComponent. You may use or inherit directly from this class. Alternatively, you may create your own C++ or blueprint class in your game based on this example.
 
-First, we need a way for the game to communicate with the module. Specifically, we need to startup the device and then to tick the device.
+Right now this component, when it ticks, tells the device to update its data and log it. This instruction is enabled through inheritance of an abstract class called IPSMoveAbstract that communicates with the module via its singleton (e.g., `IModule::Get().ModuleTick`);  TODO: Rename this IPSMoveWrapper, because it wraps the module in an interface.
 
-When this component does OnRegister, it will tell the module to startup.
-When this component does OnUnregister, it will tell the module to unset.
-When this component does Tick, it will tell the module to Tick.
-
-Our component will instruct the module instance directly (e.g., with `IModule::Get().ModuleTick`), through inheritance of an abstract class called IPSMoveAbstract. This class makes subclassing easier and also provides something like an interface described next.
+The better solution is to have the module updating its data in its own thread as fast as possible. Then our component, on each tick, will ask the device for its freshest data. If this can be done via the module singleton then any arbitrary object that can access the singleton (via implementing the module interface wrapper) can get the data.
