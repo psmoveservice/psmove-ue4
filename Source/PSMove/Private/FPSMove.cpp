@@ -66,7 +66,7 @@ void FPSMove::MoveTick(float DeltaTime)
 {
     UE_LOG(LogPSMove, Log, TEXT("Polling. TODO: get data, fire events."));
     for (int i = 0; i < m_move_count; i++) {
-        while (psmove_poll(m_moves[i])); // Why while?
+        while (psmove_poll(m_moves[i])); // Why while? Why not just poll once?
         //psmove_fusion_get_position(m_fusion, m_moves[i], &(pos.x), &(pos.y), &(pos.z));
         //psmove_fusion_get_modelview_matrix(m_fusion, m_moves[i]);
     }

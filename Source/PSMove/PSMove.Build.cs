@@ -82,19 +82,19 @@ namespace UnrealBuildTool.Rules
             {
                 isLibrarySupported = true;
                 PlatformString = (Target.Platform == UnrealTargetPlatform.Win64) ? "Win64" : "Win32";
+                PublicAdditionalLibraries.Add(Path.Combine(LibraryPath, PlatformString, "libpsmoveapi_static.a"));
+                PublicAdditionalLibraries.Add(Path.Combine(LibraryPath, PlatformString, "libpsmoveapi_tracker_static.a"));
+
             }
             else if (Target.Platform == UnrealTargetPlatform.Mac)
             {
                 isLibrarySupported = true;
                 PlatformString = "Mac";
                 //Macs load binaries slightly differently. Maybe need to use BinariesPath?
+                PublicAdditionalLibraries.Add(Path.Combine(BinariesPath, PlatformString, "libpsmoveapi.dylib"));
+                PublicAdditionalLibraries.Add(Path.Combine(BinariesPath, PlatformString, "libpsmoveapi_tracker.dylib"));
             }
 
-            if (isLibrarySupported)
-            {
-                PublicAdditionalLibraries.Add(Path.Combine(LibraryPath, PlatformString, "libpsmoveapi_static.a"));
-                PublicAdditionalLibraries.Add(Path.Combine(LibraryPath, PlatformString, "libpsmoveapi_tracker_static.a"));
-            }
             return isLibrarySupported;
         }
     }
