@@ -103,7 +103,7 @@ uint32 FPSMoveWorker::Run()
             ycm = ypx * 2.25 / rpx;
 
             //UE_LOG(LogPSMove, Log, TEXT("Pixels: %f %f %f --> cm: %f %f %f"), xpx, ypx, rpx, xcm, ycm, zcm);
-            WorkerPosition->Set(xcm, zcm, ycm); // In UE4, up/down (gravity dir) is z
+            WorkerPosition->Set(-zcm, -xcm, ycm); // In UE4, up/down (gravity dir) is z
 
         /**
          * psmoveapi's fusion classes do the following to transform these results into coordinates:
