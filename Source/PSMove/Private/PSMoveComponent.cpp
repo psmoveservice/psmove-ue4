@@ -1,7 +1,9 @@
 #include "PSMovePrivatePCH.h"
 #include "PSMoveComponent.h"
+#include "IPSMove.h"
 
-UPSMoveComponent::UPSMoveComponent(const FObjectInitializer &init) : UActorComponent(init)
+UPSMoveComponent::UPSMoveComponent(const FObjectInitializer &init)
+    : UActorComponent(init)
 {
     bWantsInitializeComponent = true;
     bAutoActivate = true;
@@ -11,5 +13,9 @@ UPSMoveComponent::UPSMoveComponent(const FObjectInitializer &init) : UActorCompo
 void UPSMoveComponent::TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction *ThisTickFunction)
 {
     Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-    RefreshPQ(); // Updates values stored in member variables Position and Orientation.
+    if (IPSMove::IsAvailable())
+    {
+        IPSMove::Get().CopyPQ(Position, Orientation);
+    }
+    this->PositionAndOrientationUpdated(Position, Orientation);
 }

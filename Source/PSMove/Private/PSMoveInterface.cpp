@@ -8,12 +8,14 @@ UPSMoveInterface::UPSMoveInterface(const class FObjectInitializer& PCIP)
     
 }
 
+/*
 void IPSMoveInterface::RefreshPQ()
 {
     if (IPSMove::IsAvailable())
     {
         // Can I actually return any data using this mechanism?
-        //IPSMove::Get().CopyPQ(Position, Orientation);
+        IPSMove::Get().CopyPQ(Position, Orientation);
     }
-        //this->PositionAndOrientationUpdated(Position, Orientation);
+        //PositionAndOrientationUpdated(Position, Orientation);//This crashes UE4.
 }
+*/

@@ -8,6 +8,7 @@
 #include "PSMovePrivatePCH.h"
 #include "FPSMoveWorker.h"
 #include "IPSMove.h"
+#include <math.h>
 
     //
 FPSMoveWorker* FPSMoveWorker::WorkerInstance = NULL;
@@ -29,6 +30,7 @@ FPSMoveWorker::FPSMoveWorker(FVector& PSMovePosition, FQuat& PSMoveOrientation)
     psmove_tracker_get_size(m_tracker, &width, &height);
     m_tracker_width = (float)width;
     m_tracker_height = (float)height;
+    UE_LOG(LogPSMove, Log, TEXT("Camera Dimensions: %f x %f"), m_tracker_width, m_tracker_height);
 
     for (int i = 0; i<m_move_count; i++)
     {
@@ -43,7 +45,7 @@ FPSMoveWorker::FPSMoveWorker(FVector& PSMovePosition, FQuat& PSMoveOrientation)
     }
 
     // I think this auto-inits and runs the thread.
-    Thread = FRunnableThread::Create(this, TEXT("FPSMoveWorker"), 0, TPri_AboveNormal);
+    Thread = FRunnableThread::Create(this, TEXT("FPSMoveWorker"), 0, TPri_BelowNormal);
 }
 
 FPSMoveWorker::~FPSMoveWorker()
@@ -70,9 +72,11 @@ bool FPSMoveWorker::Init()
 uint32 FPSMoveWorker::Run()
 {
     // TEMP - Local variables until I pass to PSMoveQuat.
-    float px, py, pr, pd;
+    float xpx, ypx, rpx;
+    float xcm, ycm, zcm;
     int buttons;
     unsigned int pressed, released;
+    //float pr_conv = (M_PI/180.0) * (75.0/800.0); // 75 deg per 800 px
 
     //Initial wait before starting.
     FPlatformProcess::Sleep(0.03);
@@ -87,22 +91,35 @@ uint32 FPSMoveWorker::Run()
 
         for (int i = 0; i < m_move_count; i++)
         {
-            psmove_tracker_get_position(m_tracker, m_moves[i], &px, &py, &pr);
-            py = m_tracker_height - py;
-            //TODO: Use my own distance_from_radius function.
-            pd = psmove_tracker_distance_from_radius(m_tracker, pr);
-            WorkerPosition->Set(px, py, pd);
+
+            psmove_tracker_get_position(m_tracker, m_moves[i], &xpx, &ypx, &rpx);
+            //zero x and y on camera's principal axis
+            xpx = xpx - (m_tracker_width/2.0);  // Zero x on camera's principal axis
+            ypx = (m_tracker_height/2.0) - ypx;  // Zero y on camera's principal axis. ypx starts as pixels from top.
+            zcm = psmove_tracker_distance_from_radius(m_tracker, rpx);  // Use Thomas' parametric fit to get depth in cm
+            //zcm = 2.25 / sin( pr_conv * rpx ); //Use trigonometry to get depth in cm
+            // We know sphere radius = 2.25 cm, which gives us pixel->cm conversion factor at this depth.
+            xcm = xpx * 2.25 / rpx;
+            ycm = ypx * 2.25 / rpx;
+
+            //UE_LOG(LogPSMove, Log, TEXT("Pixels: %f %f %f --> cm: %f %f %f"), xpx, ypx, rpx, xcm, ycm, zcm);
+            WorkerPosition->Set(xcm, zcm, ycm); // In UE4, up/down (gravity dir) is z
+
+        /**
+         * psmoveapi's fusion classes do the following to transform these results into coordinates:
+         * projection = glm::perspectiveFov(fov, width, height, 0.1, 1000.0)
+         * viewport = glm::vec4(0., 0., width, height);
+         * modelview = glm::translate(glm::mat4(), glm::vec3(x, y, z)) * glm::mat4_cast(quaternion);
+         */
+            
 
             psmove_poll(m_moves[i]); // Required to get orientation.
-            
-            //I suppose it is possible that W,X,Y,Z do not get updated at the exact same moment.
             psmove_get_orientation(m_moves[i],
                                    &WorkerOrientation->W,
                                    &WorkerOrientation->X,
                                    &WorkerOrientation->Y,
                                    &WorkerOrientation->Z);
-
-            //UE_LOG(LogPSMove, Log, TEXT("Controller %d: pos = %f %f px, z=%f cm; orientation wxyz = %f %f %f %f"), px, py, pd, ow, ox, oy, oz);
+            //I suppose it is possible that W,X,Y,Z do not get updated at the exact same moment.
 
             buttons = psmove_get_buttons(m_moves[i]);
             psmove_get_button_events(m_moves[i], &pressed, &released);  // i.e., state change
@@ -110,7 +127,8 @@ uint32 FPSMoveWorker::Run()
             // e.g., pressed & Btn_CROSS or buttons & Btn_MOVE
         }
 
-        FPlatformProcess::Sleep(0.02);
+        //Sleeping the thread seems to crash libusb.
+        //FPlatformProcess::Sleep(0.005);
 
     }
 
