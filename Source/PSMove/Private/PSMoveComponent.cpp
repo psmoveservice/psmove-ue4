@@ -17,5 +17,4 @@ void UPSMoveComponent::TickComponent(float DeltaTime, enum ELevelTick TickType, 
     {
         IPSMove::Get().CopyPQ(Position, Orientation);
     }
-    this->PositionAndOrientationUpdated(Position, Orientation);
 }

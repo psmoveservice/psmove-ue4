@@ -53,7 +53,7 @@ That is the bare minimum for a UE4 plugin.
 
 ## Adding functionality
 
-The desired end result is an in-game class that can use Blueprints to access the module's functions. I provide an example C++ class UPSMoveComponent, subclassing UActorComponent, that has this ability. You may use or inherit directly from this class, or use it as a template to build your own C++ or Blueprint class. (TODO: Make an abstract class that has all the PSMove-specific functionality).
+The desired end result is an in-game class that can use Blueprints to access the psmove's position, orientation, buttons, and can send vibration commands (and leds? Those are managed by psmove_tracker).
 
 The FPSMove (i.e., module singleton), upon startup, initializes the FPSMoveWorker passing pointers to the module's MyPosition and MyOrientation members.
 The FPSMoveWorker's PSMoveWorkerInit function constructs a static FPSMoveWorker instance (relaying pointers to MyPosition and MyOrientation).
@@ -62,11 +62,21 @@ Upon construction of the FPSMoveWorker instance, MyPosition and MyOrientation po
 The worker Thread automatically Init() and Run(). On each iteration of the thread loop
 
 1. the tracker is updated (i.e., image pulled and orb(s) found), then for each controller
-2. The orb position is updated and set to the WorkerPosition variable.
+2. The orb position is updated and assigned to the WorkerPosition-> variables.
 3. The controller is polled.
-4. The controller orientation quaternion is obtained and set to WorkerOrientation.
+4. The controller orientation quaternion is obtained and assigned to the WorkerOrientation->.
 5. The buttons are polled (but we don’t use them currently).
 
-By copying the controller position and orientation into these variables, which are really just pointers to the module’s Position and Orientation, we have made the controller’s position and orientation available to the main game thread as members of the module singleton.
+Because WorkerOrientation and WorkerPosition are just pointers to the module's data, we have updated the value in the module, accessible via the module singleton.
 
 The PSMoveComponent, on each TickComponent, copies the module singleton ModulePosition and ModuleOrientation into its own member variables Position, Orientation. These variables can be used in game.
+
+I would prefer to use TThreadSafeSharedPtr:
+
+1. The module has a sharedptr member variable for each of Position and Orientation.
+2. The worker has similar member variables.
+3. On module construction, the sharedptrs are assigned MakeShareable(new FVector());
+4. Still on module construction, the worker shared pointers copy the module shared pointer.
+5. Any class that wants access to the Position and Orientation can copy the module's shared pointer.
+
+I tried doing this but then I didn't know how to access the shared pointer in blueprints, and then how to dereference it in blueprints.

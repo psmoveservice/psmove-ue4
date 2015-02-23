@@ -1,7 +1,6 @@
 #pragma once
 
 #include "IPSMove.h"
-#include "PSMoveInterface.h"
 #include "PSMoveComponent.generated.h"
 
 UCLASS(ClassGroup="Input Controller", meta=(BlueprintSpawnableComponent))
@@ -17,6 +16,4 @@ class UPSMoveComponent : public UActorComponent//, public IPSMoveInterface
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=PSMove)
     FQuat Orientation;
 
-    UFUNCTION(BlueprintImplementableEvent, meta=(FriendlyName = "PSMove Position and Orientation Updated"))
-    void PositionAndOrientationUpdated(FVector SendPosition, FQuat SendOrientation);
 };

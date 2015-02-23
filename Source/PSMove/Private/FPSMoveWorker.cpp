@@ -107,24 +107,28 @@ uint32 FPSMoveWorker::Run()
 
         /**
          * psmoveapi's fusion classes do the following to transform these results into coordinates:
-         * projection = glm::perspectiveFov(fov, width, height, 0.1, 1000.0)
-         * viewport = glm::vec4(0., 0., width, height);
+         * projection = glm::perspectiveFov(fov, m_tracker_width, m_tracker_height, 0.1, 1000.0)
+         * viewport = glm::vec4(0., 0., m_tracker_width, m_tracker_height);
          * modelview = glm::translate(glm::mat4(), glm::vec3(x, y, z)) * glm::mat4_cast(quaternion);
          */
+
+            //TODO: Apparently hidapi, called by psmove_poll, gets the oldest frame from the device.
+            //Is it necessary to keep polling until no frames are left?
+            while (psmove_poll(m_moves[i]) > 0)
+            {
+                psmove_poll(m_moves[i]); // Required to get orientation.
+                psmove_get_orientation(m_moves[i],
+                                   &(WorkerOrientation->W),
+                                   &(WorkerOrientation->X),
+                                   &(WorkerOrientation->Y),
+                                   &(WorkerOrientation->Z));
+                //I suppose it is possible that W,X,Y,Z do not get updated at the exact same moment.
+
+                buttons = psmove_get_buttons(m_moves[i]);
+                psmove_get_button_events(m_moves[i], &pressed, &released);  // i.e., state change
+                // e.g., pressed & Btn_CROSS or buttons & Btn_MOVE
+            }
             
-
-            psmove_poll(m_moves[i]); // Required to get orientation.
-            psmove_get_orientation(m_moves[i],
-                                   &WorkerOrientation->W,
-                                   &WorkerOrientation->X,
-                                   &WorkerOrientation->Y,
-                                   &WorkerOrientation->Z);
-            //I suppose it is possible that W,X,Y,Z do not get updated at the exact same moment.
-
-            buttons = psmove_get_buttons(m_moves[i]);
-            psmove_get_button_events(m_moves[i], &pressed, &released);  // i.e., state change
-
-            // e.g., pressed & Btn_CROSS or buttons & Btn_MOVE
         }
 
         //Sleeping the thread seems to crash libusb.
