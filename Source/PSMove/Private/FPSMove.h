@@ -20,5 +20,6 @@ public:
     FQuat ModuleOrientation;
 
     /** IPSMove implementation */
-    void CopyPQ(FVector& InPosition, FQuat& InOrientation) const;
+    const FVector GetPosition() const;
+    const FQuat GetOrientation() const;
 };

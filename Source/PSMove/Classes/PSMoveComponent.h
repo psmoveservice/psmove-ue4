@@ -8,12 +8,13 @@ class UPSMoveComponent : public UActorComponent//, public IPSMoveInterface
 {
     GENERATED_UCLASS_BODY()
 
-    virtual void TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction *ThisTickFunction) override;
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category="PSMove")
+    const FVector GetPosition() const;
 
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=PSMove)
-    FVector Position;
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category="PSMove")
+    const FQuat GetOrientation() const;
 
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=PSMove)
-    FQuat Orientation;
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category="PSMove")
+    const FRotator GetRotator() const;
 
 };

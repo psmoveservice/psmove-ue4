@@ -39,5 +39,6 @@ public:
      * Here we declare functions that will be used to access the module instance from within the game.
      * Implemented in Private/FPSMove.cpp
      */
-    virtual void CopyPQ(FVector& InPosition, FQuat& InOrientation) const{};
+    virtual const FVector GetPosition() const {return FVector(0.0);}
+    virtual const FQuat GetOrientation() const {return FQuat(0.0, 0.0, 0.0, 1.0);}
 };

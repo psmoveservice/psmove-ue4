@@ -10,11 +10,32 @@ UPSMoveComponent::UPSMoveComponent(const FObjectInitializer &init)
     PrimaryComponentTick.bCanEverTick = true;
 }
 
-void UPSMoveComponent::TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction *ThisTickFunction)
+const FVector UPSMoveComponent::GetPosition() const
 {
-    Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
     if (IPSMove::IsAvailable())
     {
-        IPSMove::Get().CopyPQ(Position, Orientation);
+        return IPSMove::Get().GetPosition();
     }
+    return FVector(0.0);
+}
+
+const FQuat UPSMoveComponent::GetOrientation() const
+{
+    if (IPSMove::IsAvailable())
+    {
+        return IPSMove::Get().GetOrientation();
+    }
+    return FQuat(0.0, 0.0, 0.0, 1.0);
+}
+
+const FRotator UPSMoveComponent::GetRotator() const
+{
+    FRotator rotator = FRotator(0.0);
+    if (IPSMove::IsAvailable())
+    {
+        rotator = IPSMove::Get().GetOrientation().Rotator();
+        rotator.Pitch *= -1;
+        rotator.Yaw *= -1;
+    }
+    return rotator;
 }

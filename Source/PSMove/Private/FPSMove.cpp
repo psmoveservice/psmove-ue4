@@ -32,9 +32,12 @@ void FPSMove::ShutdownModule()
 
 }
 
-void FPSMove::CopyPQ(FVector& InPosition, FQuat& InOrientation) const
+const FVector FPSMove::GetPosition() const
 {
-        //UE_LOG(LogPSMove, Log, TEXT("Called via Singleton access to IPSMove::Get().RefreshPQ()"));
-    InPosition = ModulePosition;
-    InOrientation = ModuleOrientation;
+    return ModulePosition;
+}
+
+const FQuat FPSMove::GetOrientation() const
+{
+    return ModuleOrientation;
 }
