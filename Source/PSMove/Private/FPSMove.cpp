@@ -8,6 +8,8 @@
 IMPLEMENT_MODULE( FPSMove, PSMove )
 
 FPSMove::FPSMove()
+    : ModulePosition(FVector(0.0)),
+      ModuleOrientation(FQuat(0.0, 0.0, 0.0, 1.0))
 {
 
 }

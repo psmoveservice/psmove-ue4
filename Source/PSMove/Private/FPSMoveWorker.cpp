@@ -16,36 +16,39 @@ FPSMoveWorker* FPSMoveWorker::WorkerInstance = NULL;
 FPSMoveWorker::FPSMoveWorker(FVector& PSMovePosition, FQuat& PSMoveOrientation)
     : StopTaskCounter(0)
 {
-    UE_LOG(LogPSMove, Log, TEXT("FPSMoveWorker::FPSMoveWorker"));
     WorkerPosition = &PSMovePosition;
     WorkerOrientation = &PSMoveOrientation;
 
     m_move_count = psmove_count_connected();
     UE_LOG(LogPSMove, Log, TEXT("Found %d PSMove controllers."), m_move_count);
-    m_moves = (PSMove**)calloc(m_move_count, sizeof(PSMove*));
+
     m_tracker = psmove_tracker_new();
-    psmove_tracker_set_exposure(m_tracker, Exposure_LOW);
-
-    int width, height;
-    psmove_tracker_get_size(m_tracker, &width, &height);
-    m_tracker_width = (float)width;
-    m_tracker_height = (float)height;
-    UE_LOG(LogPSMove, Log, TEXT("Camera Dimensions: %f x %f"), m_tracker_width, m_tracker_height);
-
-    for (int i = 0; i<m_move_count; i++)
+    if (m_tracker && m_move_count>0)
     {
-        m_moves[i] = psmove_connect_by_id(i);
-        psmove_enable_orientation(m_moves[i], PSMove_True);
-        assert(psmove_has_orientation(m_moves[i]));
+        psmove_tracker_set_exposure(m_tracker, Exposure_LOW);
 
-        while (psmove_tracker_enable(m_tracker, m_moves[i]) != Tracker_CALIBRATED);
-            //TODO: psmove_tracker_enable_with_color(m_tracker, m_moves[i], r, g, b)
-            //TODO: psmove_tracker_get_color(m_tracker, m_moves[i],unisgned char &r, &g, &b);
-        enum PSMove_Bool auto_update_leds = psmove_tracker_get_auto_update_leds(m_tracker, m_moves[i]);
+        int width, height;
+        psmove_tracker_get_size(m_tracker, &width, &height);
+        m_tracker_width = (float)width;
+        m_tracker_height = (float)height;
+        UE_LOG(LogPSMove, Log, TEXT("Camera Dimensions: %f x %f"), m_tracker_width, m_tracker_height);
+
+        m_moves = (PSMove**)calloc(m_move_count, sizeof(PSMove*));
+        for (int i = 0; i<m_move_count; i++)
+        {
+            m_moves[i] = psmove_connect_by_id(i);
+            psmove_enable_orientation(m_moves[i], PSMove_True);
+            assert(psmove_has_orientation(m_moves[i]));
+
+            while (psmove_tracker_enable(m_tracker, m_moves[i]) != Tracker_CALIBRATED);
+                //TODO: psmove_tracker_enable_with_color(m_tracker, m_moves[i], r, g, b)
+                //TODO: psmove_tracker_get_color(m_tracker, m_moves[i],unisgned char &r, &g, &b);
+            enum PSMove_Bool auto_update_leds = psmove_tracker_get_auto_update_leds(m_tracker, m_moves[i]);
+        }
+
+        // I think this auto-inits and runs the thread.
+        Thread = FRunnableThread::Create(this, TEXT("FPSMoveWorker"), 0, TPri_BelowNormal);
     }
-
-    // I think this auto-inits and runs the thread.
-    Thread = FRunnableThread::Create(this, TEXT("FPSMoveWorker"), 0, TPri_BelowNormal);
 }
 
 FPSMoveWorker::~FPSMoveWorker()
