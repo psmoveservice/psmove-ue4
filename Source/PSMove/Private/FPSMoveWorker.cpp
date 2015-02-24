@@ -20,35 +20,41 @@ FPSMoveWorker::FPSMoveWorker(FVector& PSMovePosition, FQuat& PSMoveOrientation)
     WorkerOrientation = &PSMoveOrientation;
 
     m_move_count = psmove_count_connected();
+    m_moves = (PSMove**)calloc(m_move_count, sizeof(PSMove*));
     UE_LOG(LogPSMove, Log, TEXT("Found %d PSMove controllers."), m_move_count);
-
     m_tracker = psmove_tracker_new();
-    if (m_tracker && m_move_count>0)
+    
+    if (m_move_count>0)
     {
-        psmove_tracker_set_exposure(m_tracker, Exposure_LOW);
-
-        int width, height;
-        psmove_tracker_get_size(m_tracker, &width, &height);
-        m_tracker_width = (float)width;
-        m_tracker_height = (float)height;
-        UE_LOG(LogPSMove, Log, TEXT("Camera Dimensions: %f x %f"), m_tracker_width, m_tracker_height);
-
-        m_moves = (PSMove**)calloc(m_move_count, sizeof(PSMove*));
         for (int i = 0; i<m_move_count; i++)
         {
             m_moves[i] = psmove_connect_by_id(i);
             psmove_enable_orientation(m_moves[i], PSMove_True);
             assert(psmove_has_orientation(m_moves[i]));
+        }
 
-            while (psmove_tracker_enable(m_tracker, m_moves[i]) != Tracker_CALIBRATED);
+        if (m_tracker)
+        {
+            psmove_tracker_set_exposure(m_tracker, Exposure_LOW);
+            int width, height;
+            psmove_tracker_get_size(m_tracker, &width, &height);
+            m_tracker_width = (float)width;
+            m_tracker_height = (float)height;
+            UE_LOG(LogPSMove, Log, TEXT("Camera Dimensions: %f x %f"), m_tracker_width, m_tracker_height);
+
+            for (int i = 0; i<m_move_count; i++)
+            {
+                while (psmove_tracker_enable(m_tracker, m_moves[i]) != Tracker_CALIBRATED);
                 //TODO: psmove_tracker_enable_with_color(m_tracker, m_moves[i], r, g, b)
                 //TODO: psmove_tracker_get_color(m_tracker, m_moves[i],unisgned char &r, &g, &b);
-            enum PSMove_Bool auto_update_leds = psmove_tracker_get_auto_update_leds(m_tracker, m_moves[i]);
+                enum PSMove_Bool auto_update_leds = psmove_tracker_get_auto_update_leds(m_tracker, m_moves[i]);
+            }
         }
+    }
 
         // I think this auto-inits and runs the thread.
         Thread = FRunnableThread::Create(this, TEXT("FPSMoveWorker"), 0, TPri_BelowNormal);
-    }
+
 }
 
 FPSMoveWorker::~FPSMoveWorker()
@@ -84,37 +90,44 @@ uint32 FPSMoveWorker::Run()
     //Initial wait before starting.
     FPlatformProcess::Sleep(0.03);
 
-    while (StopTaskCounter.GetValue() == 0)
+    while (StopTaskCounter.GetValue() == 0 && m_moves > 0)
     {
         //Poll controller, camera, and update PSMovePos and PSMoveQuat.
 
         // Renew the image on camera
-        psmove_tracker_update_image(m_tracker); // Sometimes libusb crashes here.
-        psmove_tracker_update(m_tracker, NULL); // Passing null (instead of m_moves[i]) updates all controllers.
+        if (m_tracker)
+        {
+            psmove_tracker_update_image(m_tracker); // Sometimes libusb crashes here.
+            psmove_tracker_update(m_tracker, NULL); // Passing null (instead of m_moves[i]) updates all controllers.
+
+            for (int i = 0; i < m_move_count; i++)
+            {
+                psmove_tracker_get_position(m_tracker, m_moves[i], &xpx, &ypx, &rpx);
+                //zero x and y on camera's principal axis
+                xpx = xpx - (m_tracker_width/2.0);  // Zero x on camera's principal axis
+                ypx = (m_tracker_height/2.0) - ypx;  // Zero y on camera's principal axis. ypx starts as pixels from top.
+                zcm = psmove_tracker_distance_from_radius(m_tracker, rpx);  // Use Thomas' parametric fit to get depth in cm
+                //zcm = 2.25 / sin( pr_conv * rpx ); //Use trigonometry to get depth in cm
+                // We know sphere radius = 2.25 cm, which gives us pixel->cm conversion factor at this depth.
+                xcm = xpx * 2.25 / rpx;
+                ycm = ypx * 2.25 / rpx;
+
+                //UE_LOG(LogPSMove, Log, TEXT("Pixels: %f %f %f --> cm: %f %f %f"), xpx, ypx, rpx, xcm, ycm, zcm);
+                WorkerPosition->Set(-zcm, -xcm, ycm); // In UE4, up/down (gravity dir) is z
+
+                /**
+                 * psmoveapi's fusion classes do the following to transform these results into coordinates:
+                 * projection = glm::perspectiveFov(fov, m_tracker_width, m_tracker_height, 0.1, 1000.0)
+                 * viewport = glm::vec4(0., 0., m_tracker_width, m_tracker_height);
+                 * modelview = glm::translate(glm::mat4(), glm::vec3(x, y, z)) * glm::mat4_cast(quaternion);
+                 */
+            }
+        } else {
+            FPlatformProcess::Sleep(0.004);
+        }
 
         for (int i = 0; i < m_move_count; i++)
         {
-
-            psmove_tracker_get_position(m_tracker, m_moves[i], &xpx, &ypx, &rpx);
-            //zero x and y on camera's principal axis
-            xpx = xpx - (m_tracker_width/2.0);  // Zero x on camera's principal axis
-            ypx = (m_tracker_height/2.0) - ypx;  // Zero y on camera's principal axis. ypx starts as pixels from top.
-            zcm = psmove_tracker_distance_from_radius(m_tracker, rpx);  // Use Thomas' parametric fit to get depth in cm
-            //zcm = 2.25 / sin( pr_conv * rpx ); //Use trigonometry to get depth in cm
-            // We know sphere radius = 2.25 cm, which gives us pixel->cm conversion factor at this depth.
-            xcm = xpx * 2.25 / rpx;
-            ycm = ypx * 2.25 / rpx;
-
-            //UE_LOG(LogPSMove, Log, TEXT("Pixels: %f %f %f --> cm: %f %f %f"), xpx, ypx, rpx, xcm, ycm, zcm);
-            WorkerPosition->Set(-zcm, -xcm, ycm); // In UE4, up/down (gravity dir) is z
-
-        /**
-         * psmoveapi's fusion classes do the following to transform these results into coordinates:
-         * projection = glm::perspectiveFov(fov, m_tracker_width, m_tracker_height, 0.1, 1000.0)
-         * viewport = glm::vec4(0., 0., m_tracker_width, m_tracker_height);
-         * modelview = glm::translate(glm::mat4(), glm::vec3(x, y, z)) * glm::mat4_cast(quaternion);
-         */
-
             //TODO: Apparently hidapi, called by psmove_poll, gets the oldest frame from the device.
             //Is it necessary to keep polling until no frames are left?
             while (psmove_poll(m_moves[i]) > 0)
@@ -131,7 +144,6 @@ uint32 FPSMoveWorker::Run()
                 psmove_get_button_events(m_moves[i], &pressed, &released);  // i.e., state change
                 // e.g., pressed & Btn_CROSS or buttons & Btn_MOVE
             }
-            
         }
 
         //Sleeping the thread seems to crash libusb.
@@ -167,5 +179,6 @@ void FPSMoveWorker::Shutdown()
         WorkerInstance->Thread->WaitForCompletion();
         delete WorkerInstance; // Destructor SHOULD turn off tracker.
         WorkerInstance = NULL;
+        UE_LOG(LogPSMove, Log, TEXT("WorkerInstance destroyed."));
     }
 }
