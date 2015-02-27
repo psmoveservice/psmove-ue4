@@ -9,6 +9,7 @@
 #include "FPSMoveWorker.h"
 #include "IPSMove.h"
 #include <math.h>
+#include <assert.h>
 
     //
 FPSMoveWorker* FPSMoveWorker::WorkerInstance = NULL;

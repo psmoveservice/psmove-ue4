@@ -82,8 +82,8 @@ namespace UnrealBuildTool.Rules
             {
                 isLibrarySupported = true;
                 PlatformString = (Target.Platform == UnrealTargetPlatform.Win64) ? "Win64" : "Win32";
-                PublicAdditionalLibraries.Add(Path.Combine(LibraryPath, PlatformString, "libpsmoveapi.dll.a"));
-                PublicAdditionalLibraries.Add(Path.Combine(LibraryPath, PlatformString, "libpsmoveapi_tracker.dll.a"));
+                PublicAdditionalLibraries.Add(Path.Combine(LibraryPath, PlatformString, "psmoveapi.lib"));
+                PublicAdditionalLibraries.Add(Path.Combine(LibraryPath, PlatformString, "psmoveapi_tracker.lib"));
                 //FPlatformProcess::PushDllDirectory() ???
                 //FPlatformProcess::GetDllHandle() ???
                 //PublicDelayLoadDLLs ???
