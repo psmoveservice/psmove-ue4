@@ -33,6 +33,8 @@ Then refresh your code (in Windows, right click on .uproject; in Mac, do from wi
 
 Make sure your camera is plugged in and the psmove controller is connected and in view of the camera.
 
+If in Windows, make sure to read the []psmoveapi README.win64](https://github.com/cboulay/psmoveapi/blob/master/README.win64) notes 8 and 9.
+
 Open the editor. In your game, open the Actor you want to have PSMove input. Add the PSMove component to the actor. This actor component will automatically update its variables Position (FVector, in cm) and Orientation (FQuat) from the PSMove on each tick. You can access these variables off the PSMoveComponent in blueprints.
 
 # Developer Notes
