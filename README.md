@@ -4,7 +4,7 @@ Plugin for using PSMove as input into Unreal Engine 4.
 
 # Notes
 
-This plugin is in the very early stages of development. It works in OS X and Windows 64-bit (I use 8.1 Pro). Before you even bother trying to use this plugin you should make sure you can get the [psmoveapi](https://github.com/cboulay/psmoveapi)'s test_tracker application working for you.
+This plugin is in the very early stages of development. It works in OS X and Windows 64-bit (I use 8.1 Pro). Before you even bother trying to use this plugin you should make sure you can get the [psmoveapi](https://github.com/cboulay/psmoveapi)'s test_tracker application working for you. The binaries for psmovepair and test_tracker for OSX are provided. I will get the Windows binaries sometime next week.
 
 Working features:
 
