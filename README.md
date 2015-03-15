@@ -7,7 +7,7 @@ Plugin for using PSMove as input into Unreal Engine 4.
 This plugin is in the very early stages of development. It works in OS X and Windows 64-bit (I use 8.1 Pro).
 Before you even bother trying to use this plugin you should make sure you can get the [psmoveapi](https://github.com/cboulay/psmoveapi)'s test_tracker application working for you.
 The binaries for psmovepair, magnetometer_calibration, and test_tracker for OSX are provided.
-I will supply the Windows binaries for those soon.
+I will supply the Windows binaries for those soon, or you can build them yourself from the psmoveapi.
 
 Working features:
 
@@ -22,8 +22,9 @@ Planned features:
 
 Maybe someday features:
 
-- Hot-plugging (camera must be plugged in and controller turned on when module loaded, i.e. when launching editor)
-- Controlling LEDs (psmove_tracker controls LED colours)
+- Optional 320x240 @ 140 Hz positional tracking
+- Hot-plugging
+- Controlling LEDs
 - Other camera types
 
 # Install
