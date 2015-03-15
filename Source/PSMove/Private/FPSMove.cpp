@@ -1,26 +1,15 @@
 #include "PSMovePrivatePCH.h"  // Also includes psmove api lib headers.
 
 #include <assert.h>
-#include "IPSMove.h"
 #include "FPSMove.h"
 #include "FPSMoveWorker.h"
 
 IMPLEMENT_MODULE( FPSMove, PSMove )
 
-FPSMove::FPSMove()
-    : ModulePosition(FVector(0.0)),
-      ModuleOrientation(FQuat(0.0, 0.0, 0.0, 1.0))
-{
-
-}
-
 void FPSMove::StartupModule()
 {
     UE_LOG(LogPSMove, Log, TEXT("Loading PSMove module..."));
     // This code will execute after your module is loaded into memory (but after global variables are initialized, of course.)
-    // Init the PSMoveWorker singleton. This will also init the controllers and tracker.
-    UE_LOG(LogPSMove, Log, TEXT("Initializing PSMoveWorker..."));
-    FPSMoveWorker::PSMoveWorkerInit(ModulePosition, ModuleOrientation);
 }
 
 void FPSMove::ShutdownModule()
@@ -31,15 +20,32 @@ void FPSMove::ShutdownModule()
     // TODO: Kill the PSMoveWorker. That will also disconnect the controllers and tracker.
     FPSMoveWorker::Shutdown();
     UE_LOG(LogPSMove, Log, TEXT("Shutdown PSMove module."));
-
 }
 
-const FVector FPSMove::GetPosition() const
+void FPSMove::InitWorker()
 {
-    return ModulePosition;
+    // Init the PSMoveWorker singleton if needed.
+    // This will also init the controllers and tracker if needed.
+    UE_LOG(LogPSMove, Log, TEXT("Trying to initializing PSMoveWorker..."));
+    FPSMoveWorker::PSMoveWorkerInit(ModulePositions, ModuleOrientations);
 }
 
-const FQuat FPSMove::GetOrientation() const
+const FVector FPSMove::GetPosition(uint8 PSMoveID) const
 {
-    return ModuleOrientation;
+    if (ModulePositions.IsValidIndex(PSMoveID))
+    {
+        return ModulePositions[PSMoveID];
+    } else {
+        return FVector(0.0);
+    }
+}
+
+const FQuat FPSMove::GetOrientation(uint8 PSMoveID) const
+{
+    if (ModuleOrientations.IsValidIndex(PSMoveID))
+    {
+        return ModuleOrientations[PSMoveID];
+    } else {
+        return FQuat(0.0, 0.0, 0.0, 1.0);
+    }
 }

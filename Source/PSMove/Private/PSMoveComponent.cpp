@@ -1,41 +1,46 @@
 #include "PSMovePrivatePCH.h"
 #include "PSMoveComponent.h"
-#include "IPSMove.h"
+#include "FPSMove.h"
 
 UPSMoveComponent::UPSMoveComponent(const FObjectInitializer &init)
-    : UActorComponent(init)
+: PSMoveID(0)
 {
     bWantsInitializeComponent = true;
-    bAutoActivate = true;
     PrimaryComponentTick.bCanEverTick = true;
 }
 
-const FVector UPSMoveComponent::GetPosition() const
+// Called when the game starts
+void UPSMoveComponent::InitializeComponent()
 {
-    if (IPSMove::IsAvailable())
+    Super::InitializeComponent();
+    if (FPSMove::IsAvailable())
     {
-        return IPSMove::Get().GetPosition();
+        FPSMove::Get().InitWorker();
     }
-    return FVector(0.0);
 }
 
-const FQuat UPSMoveComponent::GetOrientation() const
+// Called every frame
+void UPSMoveComponent::TickComponent( float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction )
 {
-    if (IPSMove::IsAvailable())
-    {
-        return IPSMove::Get().GetOrientation();
-    }
-    return FQuat(0.0, 0.0, 0.0, 1.0);
+    Super::TickComponent( DeltaTime, TickType, ThisTickFunction );
+
+    UpdateData(DeltaTime);
+
 }
 
-const FRotator UPSMoveComponent::GetRotator() const
+void UPSMoveComponent::UpdateData( float DeltaSeconds )
 {
-    FRotator rotator = FRotator(0.0);
-    if (IPSMove::IsAvailable())
+    OnDataUpdatedImpl( PSMoveID, DeltaSeconds );  // TODO: Make first argument something useful.
+    OnDataUpdated.Broadcast( PSMoveID, DeltaSeconds );
+}
+
+void UPSMoveComponent::OnDataUpdatedImpl(int32 MoveID, float DeltaSeconds)
+{
+    if (FPSMove::IsAvailable())
     {
-        rotator = IPSMove::Get().GetOrientation().Rotator();
-        rotator.Pitch *= -1;
-        rotator.Yaw *= -1;
+        Position = FPSMove::Get().GetPosition(MoveID);
+        Rotation = FPSMove::Get().GetOrientation(MoveID).Rotator();
+        Rotation.Pitch *= -1;
+        Rotation.Yaw *= -1;
     }
-    return rotator;
 }
