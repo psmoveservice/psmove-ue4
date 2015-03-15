@@ -55,4 +55,4 @@ In Blueprints, add the OnDataUpdated event.
 Next to that, drag the PSMove component into the graph.
 Whenever the OnDataUpdated event fires, get Position and get Rotation from the PSMove component.
 Then tie those into the Set Actor Location and Rotation node.
-![BP example](https://github.com/cboulay/psmove-ue4/master/bp.png)
+![BP example](https://github.com/cboulay/psmove-ue4/blob/master/bp.png)
