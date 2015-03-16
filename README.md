@@ -5,9 +5,6 @@ Plugin for using PSMove as input into Unreal Engine 4.
 # Notes
 
 This plugin is in the very early stages of development. It works in OS X and Windows 64-bit (I use 8.1 Pro).
-Before you even bother trying to use this plugin you should make sure you can get the [psmoveapi](https://github.com/cboulay/psmoveapi)'s test_tracker application working for you.
-The binaries for psmovepair, magnetometer_calibration, and test_tracker for OSX are provided.
-I will supply the Windows binaries for those soon, or you can build them yourself from the psmoveapi.
 
 Working features:
 
@@ -26,6 +23,16 @@ Maybe someday features:
 - Hot-plugging
 - Controlling LEDs
 - Other camera types
+
+# Setup
+
+Before you even bother trying to use this plugin you should make sure you can get the [psmoveapi](https://github.com/cboulay/psmoveapi)'s test_tracker application working for you.
+The binaries for psmovepair, magnetometer_calibration, and test_tracker for Windows and OSX are provided with thisi plugin in the `ThirdParty\psmoveapi\lib` directory.
+
+* Run psmovepair to pair the controller's bluetooth to your computer's bluetooth.
+    * In Windows this should pair successfully but will probably fail to connect. If that happens, read [here](https://github.com/cboulay/psmoveapi/blob/master/WINDOWS_EXTRA)
+* Run magnetometer_calibration
+* Run test_tracker. Do it a few times until you get a feel for where the controller should be during the blinking calibration (I like the results when I hold it about 2 m away). This can have a huge affect on your tracker performance.
 
 # Install
 
