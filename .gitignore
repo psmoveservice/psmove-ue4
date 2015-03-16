@@ -27,6 +27,6 @@ UE4Editor*
 #*.lib
 
 # Executables
-*.exe
+#*.exe
 *.out
 *.app
