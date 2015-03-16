@@ -7,23 +7,23 @@
 //
 #include "PSMovePrivatePCH.h"
 #include "FPSMoveWorker.h"
-#include "IPSMove.h"
+#include "FPSMove.h"
 #include <math.h>
 #include <assert.h>
 
     //
 FPSMoveWorker* FPSMoveWorker::WorkerInstance = NULL;
 
-FPSMoveWorker::FPSMoveWorker(FVector& PSMovePosition, FQuat& PSMoveOrientation)
+FPSMoveWorker::FPSMoveWorker(TArray<FVector>& PSMovePositions, TArray<FQuat>& PSMoveOrientations)
     : StopTaskCounter(0)
 {
-    WorkerPosition = &PSMovePosition;
-    WorkerOrientation = &PSMoveOrientation;
+    WorkerPositions = &PSMovePositions;
+    WorkerOrientations = &PSMoveOrientations;
 
     m_move_count = psmove_count_connected();
     m_moves = (PSMove**)calloc(m_move_count, sizeof(PSMove*));
     UE_LOG(LogPSMove, Log, TEXT("Found %d PSMove controllers."), m_move_count);
-    m_tracker = psmove_tracker_new();
+    m_tracker = psmove_tracker_new(); // Unfortunately the API does not have a way to change the resolution and framerate.
     
     if (m_move_count>0)
     {
@@ -32,6 +32,7 @@ FPSMoveWorker::FPSMoveWorker(FVector& PSMovePosition, FQuat& PSMoveOrientation)
             m_moves[i] = psmove_connect_by_id(i);
             psmove_enable_orientation(m_moves[i], PSMove_True);
             assert(psmove_has_orientation(m_moves[i]));
+            WorkerOrientations->Add(FQuat(0.0, 0.0, 0.0, 1.0));
         }
 
         if (m_tracker)
@@ -49,12 +50,13 @@ FPSMoveWorker::FPSMoveWorker(FVector& PSMovePosition, FQuat& PSMoveOrientation)
                 //TODO: psmove_tracker_enable_with_color(m_tracker, m_moves[i], r, g, b)
                 //TODO: psmove_tracker_get_color(m_tracker, m_moves[i],unisgned char &r, &g, &b);
                 enum PSMove_Bool auto_update_leds = psmove_tracker_get_auto_update_leds(m_tracker, m_moves[i]);
+                WorkerPositions->Add(FVector(0.0));
             }
         }
     }
 
         // I think this auto-inits and runs the thread.
-        Thread = FRunnableThread::Create(this, TEXT("FPSMoveWorker"), 0, TPri_BelowNormal);
+        Thread = FRunnableThread::Create(this, TEXT("FPSMoveWorker"), 0, TPri_AboveNormal);
 
 }
 
@@ -114,7 +116,7 @@ uint32 FPSMoveWorker::Run()
                 ycm = ypx * 2.25 / rpx;
 
                 //UE_LOG(LogPSMove, Log, TEXT("Pixels: %f %f %f --> cm: %f %f %f"), xpx, ypx, rpx, xcm, ycm, zcm);
-                WorkerPosition->Set(-zcm, -xcm, ycm); // In UE4, up/down (gravity dir) is z
+                (*WorkerPositions)[i].Set(-zcm, -xcm, ycm); // In UE4, up/down (gravity dir) is z
 
                 /**
                  * psmoveapi's fusion classes do the following to transform these results into coordinates:
@@ -135,12 +137,13 @@ uint32 FPSMoveWorker::Run()
             {
                 psmove_poll(m_moves[i]); // Required to get orientation.
                 psmove_get_orientation(m_moves[i],
-                                   &(WorkerOrientation->W),
-                                   &(WorkerOrientation->X),
-                                   &(WorkerOrientation->Y),
-                                   &(WorkerOrientation->Z));
+                                   &((*WorkerOrientations)[i].W),
+                                   &((*WorkerOrientations)[i].X),
+                                   &((*WorkerOrientations)[i].Y),
+                                   &((*WorkerOrientations)[i].Z));
                 //I suppose it is possible that W,X,Y,Z do not get updated at the exact same moment.
 
+                //TODO: Actually do something with buttons.
                 buttons = psmove_get_buttons(m_moves[i]);
                 psmove_get_button_events(m_moves[i], &pressed, &released);  // i.e., state change
                 // e.g., pressed & Btn_CROSS or buttons & Btn_MOVE
@@ -160,13 +163,15 @@ void FPSMoveWorker::Stop()
     StopTaskCounter.Increment();
 }
 
-FPSMoveWorker* FPSMoveWorker::PSMoveWorkerInit(FVector& PSMovePosition, FQuat& PSMoveOrientation)
+FPSMoveWorker* FPSMoveWorker::PSMoveWorkerInit(TArray<FVector>& PSMovePositions, TArray<FQuat>& PSMoveOrientations)
 {
     UE_LOG(LogPSMove, Log, TEXT("FPSMoveWorker::PSMoveWorkerInit"));
     if (!WorkerInstance && FPlatformProcess::SupportsMultithreading())
     {
         UE_LOG(LogPSMove, Log, TEXT("Creating new WorkerInstance"));
-        WorkerInstance = new FPSMoveWorker(PSMovePosition, PSMoveOrientation);
+        WorkerInstance = new FPSMoveWorker(PSMovePositions, PSMoveOrientations);
+    } else {
+        UE_LOG(LogPSMove, Log, TEXT("FPSMoveWorker already instanced."));
     }
     return WorkerInstance;
 }

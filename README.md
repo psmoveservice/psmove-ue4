@@ -4,15 +4,17 @@ Plugin for using PSMove as input into Unreal Engine 4.
 
 # Notes
 
-This plugin is in the very early stages of development. It works in OS X and Windows 64-bit (I use 8.1 Pro). Before you even bother trying to use this plugin you should make sure you can get the [psmoveapi](https://github.com/cboulay/psmoveapi)'s test_tracker application working for you. The binaries for psmovepair and test_tracker for OSX are provided. I will get the Windows binaries sometime next week.
+This plugin is in the very early stages of development. It works in OS X and Windows 64-bit (I use 8.1 Pro).
+Before you even bother trying to use this plugin you should make sure you can get the [psmoveapi](https://github.com/cboulay/psmoveapi)'s test_tracker application working for you.
+The binaries for psmovepair, magnetometer_calibration, and test_tracker for OSX are provided.
+I will supply the Windows binaries for those soon, or you can build them yourself from the psmoveapi.
 
 Working features:
 
-- Position and orientation of a single controller.
+- Position and orientation of multiple controllers.
 
 Planned features:
 
-- Multiple controllers (currently only uses last controller)
 - Detect button presses —> events
 - Controlling vibration
 - Zeroing position and orientation
@@ -20,8 +22,9 @@ Planned features:
 
 Maybe someday features:
 
-- Hot-plugging (camera must be plugged in and controller turned on when module loaded, i.e. when launching editor)
-- Controlling LEDs (psmove_tracker controls LED colours)
+- Optional 320x240 @ 140 Hz positional tracking
+- Hot-plugging
+- Controlling LEDs
 - Other camera types
 
 # Install
@@ -39,6 +42,18 @@ In Windows command prompt, replace 'mv' with 'rename'.
 
 Then refresh your code (in Windows, right click on .uproject; in Mac, use File>Refresh XCode Project from within editor) and build your project.
 
-Make sure your camera is plugged in and the psmove controller is connected and in view of the camera before you launch the editor. If you are using Windows then getting the controller connected and the camera working requires a little work. Be sure to read the [psmoveapi README.win64](https://github.com/cboulay/psmoveapi/blob/master/README.win64) notes 8 and 9.
+Make sure your camera is plugged in and the psmove controller is connected and in view of the camera before you launch the editor.
+If you are using Windows then getting the controller connected and the camera working requires a little work.
+Be sure to read the [psmoveapi WINDOWS_EXTRA](https://github.com/cboulay/psmoveapi/blob/master/WINDOWS_EXTRA) notes.
 
-Open the editor. In your game, open the Actor you want to have PSMove input. Add the PSMove component to the actor. This actor component will automatically update its variables Position (FVector, in cm) and Rotator (FRot) from the PSMove on each tick. You can access these variables off the PSMove component in blueprints and use them to Set Actor Location and Rotation.
+# Use
+
+Open the editor.
+Create a cube and scale it to about 0.1, 0.1, 0.3. Make the cube movable.
+Add to the cube a PSMove component.
+Create + Edit the object's blueprint.
+In Blueprints, add the OnDataUpdated event.
+Next to that, drag the PSMove component into the graph.
+Whenever the OnDataUpdated event fires, get Position and get Rotation from the PSMove component.
+Then tie those into the Set Actor Location and Rotation node.
+![BP example](https://github.com/cboulay/psmove-ue4/blob/master/bp.png)
