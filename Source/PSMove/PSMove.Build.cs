@@ -18,10 +18,6 @@ namespace UnrealBuildTool.Rules
         {
             get { return Path.GetFullPath(Path.Combine(ModulePath, "../../Binaries/")); }
         }
-        private string IncludPath
-        {
-            get { return Path.GetFullPath(Path.Combine(ThirdPartyPath, "psmoveapi", "include")); }
-        }
         private string LibraryPath
         {
             get { return Path.GetFullPath(Path.Combine(ThirdPartyPath, "psmoveapi", "lib")); }
