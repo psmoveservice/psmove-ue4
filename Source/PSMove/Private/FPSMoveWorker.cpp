@@ -96,8 +96,6 @@ uint32 FPSMoveWorker::Run()
     // TEMP - Local variables until I pass to PSMoveQuat.
     float xpx, ypx, rpx;
     float xcm, ycm, zcm;
-    int buttons;
-    unsigned int pressed, released;
     //float pr_conv = (M_PI/180.0) * (75.0/800.0); // 75 deg per 800 px
 
     //Initial wait before starting.
