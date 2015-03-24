@@ -10,10 +10,11 @@ Working features:
 
 - Position and orientation of multiple controllers.
 - Button presses trigger events.
+- Trigger-button value (0-255)
+- Set vibration (0-255)
 
 Planned features:
 
-- Controlling vibration
 - Zeroing position and orientation
 - Co-registration with HMD
 

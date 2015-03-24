@@ -41,7 +41,7 @@ public:
     TArray<uint32> ModulePressed;
     TArray<uint32> ModuleReleased;
     TArray<uint8> ModuleTriggers;
-    //TArray<uint8> ModuleRumbleRequests;
+    TArray<uint8> ModuleRumbleRequests;
     
     /**
      * Here we declare functions that will be accessed via the module instance from within the game.
@@ -53,5 +53,5 @@ public:
     virtual const uint32 GetPressed(uint8 PSMoveID) const;
     virtual const uint32 GetReleased(uint8 PSMoveID) const;
     virtual const uint8 GetTrigger(uint8 PSMoveID) const;
-    //virtual void SetRumble(uint8 PSMoveID, uint8 RumbleValue);
+    virtual void SetRumble(uint8 PSMoveID, uint8 RumbleValue);
 };

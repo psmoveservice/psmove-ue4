@@ -14,7 +14,7 @@
     //
 FPSMoveWorker* FPSMoveWorker::WorkerInstance = NULL;
 
-FPSMoveWorker::FPSMoveWorker(TArray<FVector>& PSMovePositions, TArray<FQuat>& PSMoveOrientations, TArray<uint32>& PSMoveButtons, TArray<uint32>& PSMovePressed, TArray<uint32>& PSMoveReleased, TArray<uint8>& PSMoveTriggers)  //, TArray<uint8>& PSMoveRumbleRequests
+FPSMoveWorker::FPSMoveWorker(TArray<FVector>& PSMovePositions, TArray<FQuat>& PSMoveOrientations, TArray<uint32>& PSMoveButtons, TArray<uint32>& PSMovePressed, TArray<uint32>& PSMoveReleased, TArray<uint8>& PSMoveTriggers, TArray<uint8>& PSMoveRumbleRequests)
     : StopTaskCounter(0)
 {
     WorkerPositions = &PSMovePositions;
@@ -23,7 +23,7 @@ FPSMoveWorker::FPSMoveWorker(TArray<FVector>& PSMovePositions, TArray<FQuat>& PS
     WorkerPressed = &PSMovePressed;
     WorkerReleased = &PSMoveReleased;
     WorkerTriggers = &PSMoveTriggers;
-    //WorkerRumbleRequests = &PSMoveRumbleRequests;
+    WorkerRumbleRequests = &PSMoveRumbleRequests;
 
     m_move_count = psmove_count_connected();
     m_moves = (PSMove**)calloc(m_move_count, sizeof(PSMove*));
@@ -42,7 +42,7 @@ FPSMoveWorker::FPSMoveWorker(TArray<FVector>& PSMovePositions, TArray<FQuat>& PS
             WorkerPressed->Add(0);
             WorkerReleased->Add(0);
             WorkerTriggers->Add(0);
-            //WorkerRumbleRequests->Add(0);
+            WorkerRumbleRequests->Add(0);
         }
 
         if (m_tracker)
@@ -165,7 +165,7 @@ uint32 FPSMoveWorker::Run()
                 (*WorkerTriggers)[i] = temp;
                 
                 // Set the controller rumble (uint8; 0-255)
-                //psmove_set_rumble(m_moves[i], (*WorkerRumbleRequests)[i]);
+                psmove_set_rumble(m_moves[i], (*WorkerRumbleRequests)[i]);
             }
         }
 
@@ -182,13 +182,13 @@ void FPSMoveWorker::Stop()
     StopTaskCounter.Increment();
 }
 
-FPSMoveWorker* FPSMoveWorker::PSMoveWorkerInit(TArray<FVector>& PSMovePositions, TArray<FQuat>& PSMoveOrientations, TArray<uint32>& PSMoveButtons, TArray<uint32>& PSMovePressed, TArray<uint32>& PSMoveReleased, TArray<uint8>& PSMoveTriggers) //TArray<uint8>& PSMoveRumbleRequests
+FPSMoveWorker* FPSMoveWorker::PSMoveWorkerInit(TArray<FVector>& PSMovePositions, TArray<FQuat>& PSMoveOrientations, TArray<uint32>& PSMoveButtons, TArray<uint32>& PSMovePressed, TArray<uint32>& PSMoveReleased, TArray<uint8>& PSMoveTriggers, TArray<uint8>& PSMoveRumbleRequests)
 {
     UE_LOG(LogPSMove, Log, TEXT("FPSMoveWorker::PSMoveWorkerInit"));
     if (!WorkerInstance && FPlatformProcess::SupportsMultithreading())
     {
         UE_LOG(LogPSMove, Log, TEXT("Creating new FPSMoveWorker instance."));
-        WorkerInstance = new FPSMoveWorker(PSMovePositions, PSMoveOrientations, PSMoveButtons, PSMovePressed, PSMoveReleased, PSMoveTriggers); //PSMoveRumbleRequests
+        WorkerInstance = new FPSMoveWorker(PSMovePositions, PSMoveOrientations, PSMoveButtons, PSMovePressed, PSMoveReleased, PSMoveTriggers, PSMoveRumbleRequests);
     } else {
         UE_LOG(LogPSMove, Log, TEXT("FPSMoveWorker already instanced."));
     }

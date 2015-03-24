@@ -48,8 +48,8 @@ public:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = PSMove)
     uint8 TriggerValue;
     
-    //UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = PSMove)
-    //uint8 RumbleRequest;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = PSMove)
+    uint8 RumbleRequest;
 
     // Delegate triggered once per frame update
     UPROPERTY(BlueprintAssignable, Category = PSMove)

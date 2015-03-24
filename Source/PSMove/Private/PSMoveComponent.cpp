@@ -87,6 +87,6 @@ void UPSMoveComponent::TickComponent( float DeltaTime, ELevelTick TickType, FAct
         OnTriggerButton.Broadcast(TriggerValue, Pressed & PSMove_Button::Btn_T, Released & PSMove_Button::Btn_T);
         
         // Rumble
-        //FPSMove::Get().SetRumble(PSMoveID, RumbleRequest);
+        FPSMove::Get().SetRumble(PSMoveID, RumbleRequest);
     }
 }
