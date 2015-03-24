@@ -28,45 +28,55 @@ FPSMoveWorker::FPSMoveWorker(TArray<FVector>& PSMovePositions, TArray<FQuat>& PS
     m_move_count = psmove_count_connected();
     m_moves = (PSMove**)calloc(m_move_count, sizeof(PSMove*));
     UE_LOG(LogPSMove, Log, TEXT("Found %d PSMove controllers."), m_move_count);
+
     m_tracker = psmove_tracker_new(); // Unfortunately the API does not have a way to change the resolution and framerate.
-    
-    if (m_move_count>0)
+    if (m_tracker)
     {
+        UE_LOG(LogPSMove, Log, TEXT("PSMove tracker initialized."));
+    }
+    else {
+        UE_LOG(LogPSMove, Log, TEXT("PSMove tracker failed to initialize."));
+    }
+
+    // Incrase the size of Orientation and Button arrays for each move controller
+    for (int i = 0; i<m_move_count; i++)
+    {
+        m_moves[i] = psmove_connect_by_id(i);
+        assert(m_moves[i] != NULL);
+
+        psmove_enable_orientation(m_moves[i], PSMove_True);
+        assert(psmove_has_orientation(m_moves[i]));
+
+        WorkerOrientations->Add(FQuat(0.0, 0.0, 0.0, 1.0));
+        WorkerButtons->Add(0);
+        WorkerPressed->Add(0);
+        WorkerReleased->Add(0);
+        WorkerTriggers->Add(0);
+        WorkerRumbleRequests->Add(0);
+    }
+
+    // Configure the tracker. For each controller, register it with the tracker, set its LEDs, and increase size of Positions array.
+    if (m_tracker && m_move_count>0)
+    {
+        psmove_tracker_set_exposure(m_tracker, Exposure_LOW);
+        int width, height;
+        psmove_tracker_get_size(m_tracker, &width, &height);
+        m_tracker_width = (float)width;
+        m_tracker_height = (float)height;
+        UE_LOG(LogPSMove, Log, TEXT("Camera Dimensions: %f x %f"), m_tracker_width, m_tracker_height);
+
         for (int i = 0; i<m_move_count; i++)
         {
-            m_moves[i] = psmove_connect_by_id(i);
-            psmove_enable_orientation(m_moves[i], PSMove_True);
-            assert(psmove_has_orientation(m_moves[i]));
-            WorkerOrientations->Add(FQuat(0.0, 0.0, 0.0, 1.0));
-            WorkerButtons->Add(0);
-            WorkerPressed->Add(0);
-            WorkerReleased->Add(0);
-            WorkerTriggers->Add(0);
-            WorkerRumbleRequests->Add(0);
-        }
-
-        if (m_tracker)
-        {
-            psmove_tracker_set_exposure(m_tracker, Exposure_MEDIUM);
-            int width, height;
-            psmove_tracker_get_size(m_tracker, &width, &height);
-            m_tracker_width = (float)width;
-            m_tracker_height = (float)height;
-            UE_LOG(LogPSMove, Log, TEXT("Camera Dimensions: %f x %f"), m_tracker_width, m_tracker_height);
-
-            for (int i = 0; i<m_move_count; i++)
-            {
-                while (psmove_tracker_enable(m_tracker, m_moves[i]) != Tracker_CALIBRATED);
-                //TODO: psmove_tracker_enable_with_color(m_tracker, m_moves[i], r, g, b)
-                //TODO: psmove_tracker_get_color(m_tracker, m_moves[i],unisgned char &r, &g, &b);
-                enum PSMove_Bool auto_update_leds = psmove_tracker_get_auto_update_leds(m_tracker, m_moves[i]);
-                WorkerPositions->Add(FVector(0.0));
-            }
+            while (psmove_tracker_enable(m_tracker, m_moves[i]) != Tracker_CALIBRATED);
+            //TODO: psmove_tracker_enable_with_color(m_tracker, m_moves[i], r, g, b)
+            //TODO: psmove_tracker_get_color(m_tracker, m_moves[i],unisgned char &r, &g, &b);
+            enum PSMove_Bool auto_update_leds = psmove_tracker_get_auto_update_leds(m_tracker, m_moves[i]);
+            WorkerPositions->Add(FVector(0.0));
         }
     }
 
-        // I think this auto-inits and runs the thread.
-        Thread = FRunnableThread::Create(this, TEXT("FPSMoveWorker"), 0, TPri_AboveNormal);
+    // I think this auto-inits and runs the thread.
+    Thread = FRunnableThread::Create(this, TEXT("FPSMoveWorker"), 0, TPri_AboveNormal);
 
 }
 
