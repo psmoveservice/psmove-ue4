@@ -14,7 +14,7 @@
     //
 FPSMoveWorker* FPSMoveWorker::WorkerInstance = NULL;
 
-FPSMoveWorker::FPSMoveWorker(TArray<FVector>& PSMovePositions, TArray<FQuat>& PSMoveOrientations, TArray<uint32>& PSMoveButtons, TArray<uint32>& PSMovePressed, TArray<uint32>& PSMoveReleased)
+FPSMoveWorker::FPSMoveWorker(TArray<FVector>& PSMovePositions, TArray<FQuat>& PSMoveOrientations, TArray<uint32>& PSMoveButtons, TArray<uint32>& PSMovePressed, TArray<uint32>& PSMoveReleased, TArray<uint8>& PSMoveTriggers)  //, TArray<uint8>& PSMoveRumbleRequests
     : StopTaskCounter(0)
 {
     WorkerPositions = &PSMovePositions;
@@ -22,6 +22,8 @@ FPSMoveWorker::FPSMoveWorker(TArray<FVector>& PSMovePositions, TArray<FQuat>& PS
     WorkerButtons = &PSMoveButtons;
     WorkerPressed = &PSMovePressed;
     WorkerReleased = &PSMoveReleased;
+    WorkerTriggers = &PSMoveTriggers;
+    //WorkerRumbleRequests = &PSMoveRumbleRequests;
 
     m_move_count = psmove_count_connected();
     m_moves = (PSMove**)calloc(m_move_count, sizeof(PSMove*));
@@ -39,6 +41,8 @@ FPSMoveWorker::FPSMoveWorker(TArray<FVector>& PSMovePositions, TArray<FQuat>& PS
             WorkerButtons->Add(0);
             WorkerPressed->Add(0);
             WorkerReleased->Add(0);
+            WorkerTriggers->Add(0);
+            //WorkerRumbleRequests->Add(0);
         }
 
         if (m_tracker)
@@ -141,17 +145,27 @@ uint32 FPSMoveWorker::Run()
             //Is it necessary to keep polling until no frames are left?
             while (psmove_poll(m_moves[i]) > 0)
             {
-                psmove_poll(m_moves[i]); // Required to get orientation.
+                // Update the controller status (via bluetooth)
+                psmove_poll(m_moves[i]);
+                
+                // Get the controller orientation (uses IMU).
                 psmove_get_orientation(m_moves[i],
                                    &((*WorkerOrientations)[i].W),
                                    &((*WorkerOrientations)[i].X),
                                    &((*WorkerOrientations)[i].Y),
                                    &((*WorkerOrientations)[i].Z));
                 //I suppose it is possible that W,X,Y,Z do not get updated at the exact same moment.
-
-                (*WorkerButtons)[i] = psmove_get_buttons(m_moves[i]);
+                
+                // Get the controller button state
+                (*WorkerButtons)[i] = psmove_get_buttons(m_moves[i]);  // Bitwise, if each button is down.
                 psmove_get_button_events(m_moves[i], &( (*WorkerPressed)[i] ), &( (*WorkerReleased)[i] ));  // i.e., state change
-                // e.g., pressed & Btn_CROSS or buttons & Btn_MOVE
+                
+                // Get the controller trigger value (uint8; 0-255)
+                uint8 temp = psmove_get_trigger(m_moves[i]);
+                (*WorkerTriggers)[i] = temp;
+                
+                // Set the controller rumble (uint8; 0-255)
+                //psmove_set_rumble(m_moves[i], (*WorkerRumbleRequests)[i]);
             }
         }
 
@@ -168,13 +182,13 @@ void FPSMoveWorker::Stop()
     StopTaskCounter.Increment();
 }
 
-FPSMoveWorker* FPSMoveWorker::PSMoveWorkerInit(TArray<FVector>& PSMovePositions, TArray<FQuat>& PSMoveOrientations, TArray<uint32>& PSMoveButtons, TArray<uint32>& PSMovePressed, TArray<uint32>& PSMoveReleased)
+FPSMoveWorker* FPSMoveWorker::PSMoveWorkerInit(TArray<FVector>& PSMovePositions, TArray<FQuat>& PSMoveOrientations, TArray<uint32>& PSMoveButtons, TArray<uint32>& PSMovePressed, TArray<uint32>& PSMoveReleased, TArray<uint8>& PSMoveTriggers) //TArray<uint8>& PSMoveRumbleRequests
 {
     UE_LOG(LogPSMove, Log, TEXT("FPSMoveWorker::PSMoveWorkerInit"));
     if (!WorkerInstance && FPlatformProcess::SupportsMultithreading())
     {
         UE_LOG(LogPSMove, Log, TEXT("Creating new FPSMoveWorker instance."));
-        WorkerInstance = new FPSMoveWorker(PSMovePositions, PSMoveOrientations, PSMoveButtons, PSMovePressed, PSMoveReleased);
+        WorkerInstance = new FPSMoveWorker(PSMovePositions, PSMoveOrientations, PSMoveButtons, PSMovePressed, PSMoveReleased, PSMoveTriggers); //PSMoveRumbleRequests
     } else {
         UE_LOG(LogPSMove, Log, TEXT("FPSMoveWorker already instanced."));
     }

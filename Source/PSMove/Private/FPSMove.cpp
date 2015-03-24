@@ -27,7 +27,7 @@ void FPSMove::InitWorker()
     // Init the PSMoveWorker singleton if needed.
     // This will also init the controllers and tracker if needed.
     UE_LOG(LogPSMove, Log, TEXT("Trying to initializing PSMoveWorker..."));
-    FPSMoveWorker::PSMoveWorkerInit(ModulePositions, ModuleOrientations, ModuleButtons, ModulePressed, ModuleReleased);
+    FPSMoveWorker::PSMoveWorkerInit(ModulePositions, ModuleOrientations, ModuleButtons, ModulePressed, ModuleReleased, ModuleTriggers);  // ModuleRumbleRequests
 }
 
 const FVector FPSMove::GetPosition(uint8 PSMoveID) const
@@ -75,6 +75,16 @@ const uint32 FPSMove::GetReleased(uint8 PSMoveID) const
     if (ModuleReleased.IsValidIndex(PSMoveID))
     {
         return ModuleReleased[PSMoveID];
+    } else {
+        return 0;
+    }
+}
+
+const uint8 FPSMove::GetTrigger(uint8 PSMoveID) const
+{
+    if (ModuleTriggers.IsValidIndex(PSMoveID))
+    {
+        return ModuleTriggers[PSMoveID];
     } else {
         return 0;
     }

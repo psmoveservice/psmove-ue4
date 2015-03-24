@@ -44,8 +44,12 @@ public:
     bool PSDown;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = PSMove)
     bool MoveDown;
+    
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = PSMove)
-    bool TriggerDown;
+    uint8 TriggerValue;
+    
+    //UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = PSMove)
+    //uint8 RumbleRequest;
 
     // Delegate triggered once per frame update
     UPROPERTY(BlueprintAssignable, Category = PSMove)
