@@ -37,6 +37,9 @@ public:
     
     TArray<FVector> ModulePositions;
     TArray<FQuat> ModuleOrientations;
+    TArray<uint32> ModuleButtons;
+    TArray<uint32> ModulePressed;
+    TArray<uint32> ModuleReleased;
     
     /**
      * Here we declare functions that will be accessed via the module instance from within the game.
@@ -44,4 +47,7 @@ public:
     virtual void InitWorker();
     virtual const FVector GetPosition(uint8 PSMoveID) const;
     virtual const FQuat GetOrientation(uint8 PSMoveID) const;
+    virtual const uint32 GetButtons(uint8 PSMoveID) const;
+    virtual const uint32 GetPressed(uint8 PSMoveID) const;
+    virtual const uint32 GetReleased(uint8 PSMoveID) const;
 };

@@ -27,17 +27,58 @@ public:
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = PSMove)
     FRotator Rotation;
+    
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = PSMove)
+    bool TriangleDown;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = PSMove)
+    bool CircleDown;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = PSMove)
+    bool CrossDown;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = PSMove)
+    bool SquareDown;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = PSMove)
+    bool SelectDown;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = PSMove)
+    bool StartDown;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = PSMove)
+    bool PSDown;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = PSMove)
+    bool MoveDown;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = PSMove)
+    bool TriggerDown;
 
     // Delegate triggered once per frame update
     UPROPERTY(BlueprintAssignable, Category = PSMove)
     FPSMoveDataUpdatedDelegate OnDataUpdated;
-
+    
+    // Delegates for buttons. Triggered once per frame if button is down or changes state
+    UPROPERTY(BlueprintAssignable, Category = PSMove)
+    FPSMoveTriangleButtonDelegate OnTriangleButton;
+    
+    UPROPERTY(BlueprintAssignable, Category = PSMove)
+    FPSMoveCircleButtonDelegate OnCircleButton;
+    
+    UPROPERTY(BlueprintAssignable, Category = PSMove)
+    FPSMoveCrossButtonDelegate OnCrossButton;
+    
+    UPROPERTY(BlueprintAssignable, Category = PSMove)
+    FPSMoveSquareButtonDelegate OnSquareButton;
+    
+    UPROPERTY(BlueprintAssignable, Category = PSMove)
+    FPSMoveSelectButtonDelegate OnSelectButton;
+    
+    UPROPERTY(BlueprintAssignable, Category = PSMove)
+    FPSMoveStartButtonDelegate OnStartButton;
+    
+    UPROPERTY(BlueprintAssignable, Category = PSMove)
+    FPSMovePSButtonDelegate OnPSButton;
+    
+    UPROPERTY(BlueprintAssignable, Category = PSMove)
+    FPSMoveMoveButtonDelegate OnMoveButton;
+    
+    UPROPERTY(BlueprintAssignable, Category = PSMove)
+    FPSMoveTriggerButtonDelegate OnTriggerButton;
+    
 protected:
-
-    // Copies the data and calls the update delegate
-    void UpdateData( float DeltaSeconds );
-
-    // Called before OnDataUpdated.Broadcast
-    virtual void OnDataUpdatedImpl(int32 MoveID, float DeltaSeconds);
-
+    
 };

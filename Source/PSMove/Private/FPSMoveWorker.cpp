@@ -14,11 +14,14 @@
     //
 FPSMoveWorker* FPSMoveWorker::WorkerInstance = NULL;
 
-FPSMoveWorker::FPSMoveWorker(TArray<FVector>& PSMovePositions, TArray<FQuat>& PSMoveOrientations)
+FPSMoveWorker::FPSMoveWorker(TArray<FVector>& PSMovePositions, TArray<FQuat>& PSMoveOrientations, TArray<uint32>& PSMoveButtons, TArray<uint32>& PSMovePressed, TArray<uint32>& PSMoveReleased)
     : StopTaskCounter(0)
 {
     WorkerPositions = &PSMovePositions;
     WorkerOrientations = &PSMoveOrientations;
+    WorkerButtons = &PSMoveButtons;
+    WorkerPressed = &PSMovePressed;
+    WorkerReleased = &PSMoveReleased;
 
     m_move_count = psmove_count_connected();
     m_moves = (PSMove**)calloc(m_move_count, sizeof(PSMove*));
@@ -33,11 +36,14 @@ FPSMoveWorker::FPSMoveWorker(TArray<FVector>& PSMovePositions, TArray<FQuat>& PS
             psmove_enable_orientation(m_moves[i], PSMove_True);
             assert(psmove_has_orientation(m_moves[i]));
             WorkerOrientations->Add(FQuat(0.0, 0.0, 0.0, 1.0));
+            WorkerButtons->Add(0);
+            WorkerPressed->Add(0);
+            WorkerReleased->Add(0);
         }
 
         if (m_tracker)
         {
-            psmove_tracker_set_exposure(m_tracker, Exposure_LOW);
+            psmove_tracker_set_exposure(m_tracker, Exposure_MEDIUM);
             int width, height;
             psmove_tracker_get_size(m_tracker, &width, &height);
             m_tracker_width = (float)width;
@@ -143,9 +149,8 @@ uint32 FPSMoveWorker::Run()
                                    &((*WorkerOrientations)[i].Z));
                 //I suppose it is possible that W,X,Y,Z do not get updated at the exact same moment.
 
-                //TODO: Actually do something with buttons.
-                buttons = psmove_get_buttons(m_moves[i]);
-                psmove_get_button_events(m_moves[i], &pressed, &released);  // i.e., state change
+                (*WorkerButtons)[i] = psmove_get_buttons(m_moves[i]);
+                psmove_get_button_events(m_moves[i], &( (*WorkerPressed)[i] ), &( (*WorkerReleased)[i] ));  // i.e., state change
                 // e.g., pressed & Btn_CROSS or buttons & Btn_MOVE
             }
         }
@@ -163,13 +168,13 @@ void FPSMoveWorker::Stop()
     StopTaskCounter.Increment();
 }
 
-FPSMoveWorker* FPSMoveWorker::PSMoveWorkerInit(TArray<FVector>& PSMovePositions, TArray<FQuat>& PSMoveOrientations)
+FPSMoveWorker* FPSMoveWorker::PSMoveWorkerInit(TArray<FVector>& PSMovePositions, TArray<FQuat>& PSMoveOrientations, TArray<uint32>& PSMoveButtons, TArray<uint32>& PSMovePressed, TArray<uint32>& PSMoveReleased)
 {
     UE_LOG(LogPSMove, Log, TEXT("FPSMoveWorker::PSMoveWorkerInit"));
     if (!WorkerInstance && FPlatformProcess::SupportsMultithreading())
     {
-        UE_LOG(LogPSMove, Log, TEXT("Creating new WorkerInstance"));
-        WorkerInstance = new FPSMoveWorker(PSMovePositions, PSMoveOrientations);
+        UE_LOG(LogPSMove, Log, TEXT("Creating new FPSMoveWorker instance."));
+        WorkerInstance = new FPSMoveWorker(PSMovePositions, PSMoveOrientations, PSMoveButtons, PSMovePressed, PSMoveReleased);
     } else {
         UE_LOG(LogPSMove, Log, TEXT("FPSMoveWorker already instanced."));
     }
@@ -180,11 +185,11 @@ void FPSMoveWorker::Shutdown()
 {
     if (WorkerInstance)
     {
-        UE_LOG(LogPSMove, Log, TEXT("Shutting down WorkerInstance."));
+        UE_LOG(LogPSMove, Log, TEXT("Shutting down PSMoveWorker instance."));
         WorkerInstance->Stop();
         WorkerInstance->Thread->WaitForCompletion();
         delete WorkerInstance; // Destructor SHOULD turn off tracker.
         WorkerInstance = NULL;
-        UE_LOG(LogPSMove, Log, TEXT("WorkerInstance destroyed."));
+        UE_LOG(LogPSMove, Log, TEXT("PSMoveWorker instance destroyed."));
     }
 }

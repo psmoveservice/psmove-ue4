@@ -4,15 +4,15 @@ Plugin for using PSMove as input into Unreal Engine 4.
 
 # Notes
 
-This plugin is in the very early stages of development. It works in OS X and Windows 64-bit (I use 8.1 Pro).
+This plugin works in OS X and Windows 64-bit (I use 8.1 Pro).
 
 Working features:
 
 - Position and orientation of multiple controllers.
+- Button presses trigger events.
 
 Planned features:
 
-- Detect button presses —> events
 - Controlling vibration
 - Zeroing position and orientation
 - Co-registration with HMD
@@ -26,13 +26,40 @@ Maybe someday features:
 
 # Setup
 
-Before you even bother trying to use this plugin you should make sure you can get the [psmoveapi](https://github.com/cboulay/psmoveapi)'s test_tracker application working for you.
-The binaries for psmovepair, magnetometer_calibration, and test_tracker for Windows and OSX are provided with thisi plugin in the `ThirdParty\psmoveapi\lib` directory.
+This plugin requires the [PS3EYEDriver](https://github.com/cboulay/PS3EYEDriver/tree/psm_test) version of [psmoveapi](https://github.com/cboulay/psmoveapi).
+Plug your PS Eye camera into a USB port.
 
-* Run psmovepair to pair the controller's bluetooth to your computer's bluetooth.
-    * In Windows this should pair successfully but will probably fail to connect. If that happens, read [here](https://github.com/cboulay/psmoveapi/blob/master/WINDOWS_EXTRA)
-* Run magnetometer_calibration
-* Run test_tracker. Do it a few times until you get a feel for where the controller should be during the blinking calibration (I like the results when I hold it about 2 m away). This can have a huge affect on your tracker performance.
+## OSX
+
+In the `ThirdParty\psmoveapi\lib\Mac` folder you'll find some tools.
+Plug your PSMove controller in to the computer via USB then run `psmovepair` to pair your PSMove controller to your computer.
+Then disconnect the USB cable and press the PS button on the controller to connect to the computer.
+Run `test_tracker` to test that the camera and controller are working properly.
+Run `magnetometer_calibration` to calibrate the magnetometer.
+
+In the future, you will only have to press the PS button to connect.
+
+## Windows
+
+### Camera
+
+First, uninstall any driver you may have associated with the camera (the audio device can be left alone).
+Then, use [Zadig](http://zadig.akeo.ie/) to install the libusb0.sys version of the driver for the camera.
+(You may have to reboot at this point)
+
+### Controlller
+
+Getting the PSMove controller to pair and connect on Windows has traditionally been very difficult.
+There has been a lot of progress recently in improving this process, but it is not yet streamlined.
+In this repository's `ThirdParty\psmoveapi\lib\Win64` folder you will find some tools to help.
+
+Plug the controller into the computer via USB.
+First, run `psmovepair.exe` and follow the on-screen instructions. Chances are it will pair, but it won't connect.
+Then, run `psmove-pair-win.exe` to pair yet again, only this time it'll add some additional settings that help with connecting.
+If you're still having trouble, try reading [this link](https://github.com/cboulay/psmoveapi/blob/master/WINDOWS_EXTRA)
+
+Once paired and connected, run `test_tracker` to verify that the camera and controller are working properly.
+Then run `magnetometer_calibration` to calibrate the magnetometer.
 
 # Install
 
@@ -51,9 +78,6 @@ In Windows, copy psmoveapi.dll and psmoveapi_tracker.dll from `PSMovePlugin\Thir
 
 Then refresh your code (in Windows, right click on .uproject; in Mac, use File>Refresh XCode Project from within editor) and build your project.
 
-If you are using Windows then getting the controller connected and the camera working requires a little work.
-Be sure to read the [psmoveapi WINDOWS_EXTRA](https://github.com/cboulay/psmoveapi/blob/master/WINDOWS_EXTRA) notes.
-
 # Use
 
 For example, from the default blank project:
@@ -71,10 +95,10 @@ For example, from the default blank project:
     * At this point, the camera will turn on and the controller will flash to set its brightness.
     * Make sure the controller is on and in view of the camera. I find it works best from about 2 m away.
 * Edit the blueprint as in the image below
-    * Click on the PSMove component on the left then on the right click on the + next to On Data Updated event.
-    * Next to that, drag the PSMove component into the graph.
-    * From the PSMove component, create nodes for get Position and get Rotation
+    * On the left of the blueprint editor, click on the PSMove component to select it.
+    * On the right of the blueprint editor, click on the + next to the event you want to use, e.g., On Data Updated event.
     * Create a node for Set Actor Location and Rotation
+    * Connect the event Location to the Actor Location, and the event Rotation to the Actor Rotation. Also wire up the execution points.
 * Compile, save, Play!
 
 ![BP example](https://github.com/cboulay/psmove-ue4/blob/master/bp.png)

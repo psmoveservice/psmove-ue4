@@ -10,7 +10,7 @@
 class FPSMoveWorker : public FRunnable
 {
 public:
-    FPSMoveWorker(TArray<FVector>& PSMovePositions, TArray<FQuat>& PSMoveOrientation); // Usually called by singleton access via Init
+    FPSMoveWorker(TArray<FVector>& PSMovePositions, TArray<FQuat>& PSMoveOrientation, TArray<uint32>& PSMoveButtons, TArray<uint32>& PSMovePressed, TArray<uint32>& PSMoveReleased); // Usually called by singleton access via Init
     virtual ~FPSMoveWorker(); // Why is this virtual?
 
     /** Thread for polling the controller and tracker */
@@ -19,6 +19,9 @@ public:
     /** Ptrs to data containing position and orientation. Will be passed in creator. */
     TArray<FQuat>* WorkerOrientations;
     TArray<FVector>* WorkerPositions;
+    TArray<uint32>* WorkerButtons;
+    TArray<uint32>* WorkerPressed;
+    TArray<uint32>* WorkerReleased;
 
     /** Thread Safe Counter. ?? */
     FThreadSafeCounter StopTaskCounter;
@@ -31,7 +34,7 @@ public:
     /** Singleton instance for static access. */
     static FPSMoveWorker* WorkerInstance;
     /** Static access to start the thread.*/
-    static FPSMoveWorker* PSMoveWorkerInit(TArray<FVector>& PSMovePositions, TArray<FQuat>& PSMoveOrientations);
+    static FPSMoveWorker* PSMoveWorkerInit(TArray<FVector>& PSMovePositions, TArray<FQuat>& PSMoveOrientations, TArray<uint32>& PSMoveButtons, TArray<uint32>& PSMovePressed, TArray<uint32>& PSMoveReleased);
     /** Static access to stop the thread.*/
     static void Shutdown();
 
