@@ -14,96 +14,101 @@
     //
 FPSMoveWorker* FPSMoveWorker::WorkerInstance = NULL;
 
-FPSMoveWorker::FPSMoveWorker(TArray<FVector>& PSMovePositions, TArray<FQuat>& PSMoveOrientations, TArray<uint32>& PSMoveButtons, TArray<uint32>& PSMovePressed, TArray<uint32>& PSMoveReleased, TArray<uint8>& PSMoveTriggers, TArray<uint8>& PSMoveRumbleRequests)
-    : StopTaskCounter(0)
+FPSMoveWorker::FPSMoveWorker(TArray<FPSMoveRawDataFrame>* &PSMoveRawDataArrayPtr)
+    : StopTaskCounter(0), PSMoveCount(0), MoveCheckRequested(false)
 {
-    WorkerPositions = &PSMovePositions;
-    WorkerOrientations = &PSMoveOrientations;
-    WorkerButtons = &PSMoveButtons;
-    WorkerPressed = &PSMovePressed;
-    WorkerReleased = &PSMoveReleased;
-    WorkerTriggers = &PSMoveTriggers;
-    WorkerRumbleRequests = &PSMoveRumbleRequests;
-
-    m_move_count = psmove_count_connected();
-    m_moves = (PSMove**)calloc(m_move_count, sizeof(PSMove*));
-    UE_LOG(LogPSMove, Log, TEXT("Found %d PSMove controllers."), m_move_count);
-
-    m_tracker = psmove_tracker_new(); // Unfortunately the API does not have a way to change the resolution and framerate.
-    if (m_tracker)
-    {
-        UE_LOG(LogPSMove, Log, TEXT("PSMove tracker initialized."));
-    }
-    else {
-        UE_LOG(LogPSMove, Log, TEXT("PSMove tracker failed to initialize."));
-    }
-
-    // Incrase the size of Orientation and Button arrays for each move controller
-    for (int i = 0; i<m_move_count; i++)
-    {
-        m_moves[i] = psmove_connect_by_id(i);
-        assert(m_moves[i] != NULL);
-
-        psmove_enable_orientation(m_moves[i], PSMove_True);
-        assert(psmove_has_orientation(m_moves[i]));
-
-        WorkerOrientations->Add(FQuat(0.0, 0.0, 0.0, 1.0));
-        WorkerButtons->Add(0);
-        WorkerPressed->Add(0);
-        WorkerReleased->Add(0);
-        WorkerTriggers->Add(0);
-        WorkerRumbleRequests->Add(0);
-    }
-
-    // Configure the tracker. For each controller, register it with the tracker, set its LEDs, and increase size of Positions array.
-    if (m_tracker && m_move_count>0)
-    {
-        psmove_tracker_set_exposure(m_tracker, Exposure_LOW);
-        int width, height;
-        psmove_tracker_get_size(m_tracker, &width, &height);
-        m_tracker_width = (float)width;
-        m_tracker_height = (float)height;
-        UE_LOG(LogPSMove, Log, TEXT("Camera Dimensions: %f x %f"), m_tracker_width, m_tracker_height);
-
-        for (int i = 0; i<m_move_count; i++)
-        {
-            while (psmove_tracker_enable(m_tracker, m_moves[i]) != Tracker_CALIBRATED);
-            //TODO: psmove_tracker_enable_with_color(m_tracker, m_moves[i], r, g, b)
-            //TODO: psmove_tracker_get_color(m_tracker, m_moves[i],unisgned char &r, &g, &b);
-            enum PSMove_Bool auto_update_leds = psmove_tracker_get_auto_update_leds(m_tracker, m_moves[i]);
-            WorkerPositions->Add(FVector(0.0));
-        }
-    }
-
-    // I think this auto-inits and runs the thread.
+    // Keep a reference to the Module's DataFrameArrayPtr
+    ModuleRawDataArrayPtrPtr = &PSMoveRawDataArrayPtr;
+    
+    // Need to count the number of controllers before starting the thread to guarnatee the data arrays exist before returning.
+    bool updated = UpdateMoveCount();
+    
+    // This Inits and Runs the thread.
     Thread = FRunnableThread::Create(this, TEXT("FPSMoveWorker"), 0, TPri_AboveNormal);
+}
 
+bool FPSMoveWorker::UpdateMoveCount()
+{
+    MoveCheckRequested = false;
+    int newcount = psmove_count_connected();
+    UE_LOG(LogPSMove, Log, TEXT("Found %d PSMove controllers."), newcount);
+    if (PSMoveCount != newcount)
+    {
+        PSMoveCount = newcount;
+        // Instantiate the local array of raw data frames.
+        WorkerDataFrames.SetNumZeroed(PSMoveCount);
+        // Set the module's ModuleRawDataArrayPtr to point to this thread's array of raw data frames.
+        (*ModuleRawDataArrayPtrPtr) = &WorkerDataFrames;
+        
+        return true;
+    } else {
+        return false;
+    }
 }
 
 FPSMoveWorker::~FPSMoveWorker()
 {
     UE_LOG(LogPSMove, Log, TEXT("FPSMove Destructor"));
-
-    for (int i = 0; i<m_move_count; i++)
-    {
-        psmove_disconnect(m_moves[i]);
-    }
-    psmove_tracker_free(m_tracker);
-    free(m_moves);
-
     delete Thread;
     Thread = NULL;
-
 }
 
 bool FPSMoveWorker::Init()
 {
+    bool updated = UpdateMoveCount();
     return true;
 }
 
 uint32 FPSMoveWorker::Run()
 {
-    // TEMP - Local variables until I pass to PSMoveQuat.
+    // I want the psmoves and psmove_tracker to be local variables in the thread.
+    
+    // Initialize an empty array of psmove controllers
+    TArray<PSMove*> psmoves;
+    
+    // Initialize and configure the psmove_tracker
+    PSMoveTracker *psmove_tracker = psmove_tracker_new(); // Unfortunately the API does not have a way to change the resolution and framerate.
+    int tracker_width = 640;
+    int tracker_height = 480;
+    if (psmove_tracker)
+    {
+        UE_LOG(LogPSMove, Log, TEXT("PSMove tracker initialized."));
+        
+        //Set exposure. TODO: Make this configurable.
+        psmove_tracker_set_exposure(psmove_tracker, Exposure_MEDIUM);  //Exposure_LOW, Exposure_MEDIUM, Exposure_HIGH
+        
+        psmove_tracker_get_size(psmove_tracker, &tracker_width, &tracker_height);
+        UE_LOG(LogPSMove, Log, TEXT("Camera Dimensions: %f x %f"), tracker_width, tracker_height);
+    }
+    else {
+        UE_LOG(LogPSMove, Log, TEXT("PSMove tracker failed to initialize."));
+    }
+    
+    // TODO: Move this inside the loop to run if PSMoveCount changes.
+    for (int i = 0; i < PSMoveCount; i++)
+    {
+        psmoves.Add(psmove_connect_by_id(i));
+        assert(psmoves[i] != NULL);
+        
+        psmove_enable_orientation(psmoves[i], PSMove_True);
+        assert(psmove_has_orientation(psmoves[i]));
+        
+        WorkerDataFrames[i].IsConnected = true;
+        
+        if (psmove_tracker)
+        {
+            while (psmove_tracker_enable(psmove_tracker, psmoves[i]) != Tracker_CALIBRATED); // Keep attempting to enable.
+            
+            //TODO: psmove_tracker_enable_with_color(psmove_tracker, psmoves[i], r, g, b)
+            //TODO: psmove_tracker_get_color(psmove_tracker, psmoves[i], unisgned char &r, &g, &b);
+            
+            PSMove_Bool auto_update_leds = psmove_tracker_get_auto_update_leds(psmove_tracker, psmoves[i]);
+            
+            WorkerDataFrames[i].IsTracked = true;
+        }
+    }
+    
+    // Some variables we will need in the loop:
     float xpx, ypx, rpx;
     float xcm, ycm, zcm;
     //float pr_conv = (M_PI/180.0) * (75.0/800.0); // 75 deg per 800 px
@@ -111,30 +116,35 @@ uint32 FPSMoveWorker::Run()
     //Initial wait before starting.
     FPlatformProcess::Sleep(0.03);
 
-    while (StopTaskCounter.GetValue() == 0 && m_moves > 0)
+    while (StopTaskCounter.GetValue() == 0 && PSMoveCount > 0)
     {
-        //Poll controller, camera, and update PSMovePos and PSMoveQuat.
-
-        // Renew the image on camera
-        if (m_tracker)
+        if (MoveCheckRequested && UpdateMoveCount())
         {
-            psmove_tracker_update_image(m_tracker); // Sometimes libusb crashes here.
-            psmove_tracker_update(m_tracker, NULL); // Passing null (instead of m_moves[i]) updates all controllers.
+            // TODO: Fix psmoves, psmove_enable_orientation, psmove_tracker_enable
+        }
+        
+        // Get positional data from tracker
+        if (psmove_tracker)
+        {
+            // Renew the image on camera
+            psmove_tracker_update_image(psmove_tracker); // Sometimes libusb crashes here.
+            psmove_tracker_update(psmove_tracker, NULL); // Passing null (instead of m_moves[i]) updates all controllers.
 
-            for (int i = 0; i < m_move_count; i++)
+            for (int i = 0; i < PSMoveCount; i++)
             {
-                psmove_tracker_get_position(m_tracker, m_moves[i], &xpx, &ypx, &rpx);
+                psmove_tracker_get_position(psmove_tracker, psmoves[i], &xpx, &ypx, &rpx);
+                
                 //zero x and y on camera's principal axis
-                xpx = xpx - (m_tracker_width/2.0);  // Zero x on camera's principal axis
-                ypx = (m_tracker_height/2.0) - ypx;  // Zero y on camera's principal axis. ypx starts as pixels from top.
-                zcm = psmove_tracker_distance_from_radius(m_tracker, rpx);  // Use Thomas' parametric fit to get depth in cm
+                xpx = xpx - (tracker_width/2.0);  // Zero x on camera's principal axis
+                ypx = (tracker_height/2.0) - ypx;  // Zero y on camera's principal axis. Note that ypx starts as pixels from top.
+                
+                // Convert ball radius (in pixels) to ball distance in cm.
+                WorkerDataFrames[i].PosZ = psmove_tracker_distance_from_radius(psmove_tracker, rpx);  // Use Thomas' parametric fit to get depth in cm
                 //zcm = 2.25 / sin( pr_conv * rpx ); //Use trigonometry to get depth in cm
+                
                 // We know sphere radius = 2.25 cm, which gives us pixel->cm conversion factor at this depth.
-                xcm = xpx * 2.25 / rpx;
-                ycm = ypx * 2.25 / rpx;
-
-                //UE_LOG(LogPSMove, Log, TEXT("Pixels: %f %f %f --> cm: %f %f %f"), xpx, ypx, rpx, xcm, ycm, zcm);
-                (*WorkerPositions)[i].Set(-zcm, -xcm, ycm); // In UE4, up/down (gravity dir) is z
+                WorkerDataFrames[i].PosX = xpx * 2.25 / rpx;
+                WorkerDataFrames[i].PosY = ypx * 2.25 / rpx;
 
                 /**
                  * psmoveapi's fusion classes do the following to transform these results into coordinates:
@@ -144,42 +154,55 @@ uint32 FPSMoveWorker::Run()
                  */
             }
         } else {
-            FPlatformProcess::Sleep(0.004);
+            FPlatformProcess::Sleep(0.001);
         }
-
-        for (int i = 0; i < m_move_count; i++)
+        
+        // Do bluetooth IO: Orientation, Buttons, Rumble
+        for (int i = 0; i < PSMoveCount; i++)
         {
-            //TODO: Apparently hidapi, called by psmove_poll, gets the oldest frame from the device.
-            //Is it necessary to keep polling until no frames are left?
-            while (psmove_poll(m_moves[i]) > 0)
+            //TODO: Is it necessary to keep polling until no frames are left?
+            while (psmove_poll(psmoves[i]) > 0)
             {
                 // Update the controller status (via bluetooth)
-                psmove_poll(m_moves[i]);
+                psmove_poll(psmoves[i]);
                 
                 // Get the controller orientation (uses IMU).
-                psmove_get_orientation(m_moves[i],
-                                   &((*WorkerOrientations)[i].W),
-                                   &((*WorkerOrientations)[i].X),
-                                   &((*WorkerOrientations)[i].Y),
-                                   &((*WorkerOrientations)[i].Z));
+                psmove_get_orientation(psmoves[i],
+                                   &(WorkerDataFrames[i].OriW),
+                                   &(WorkerDataFrames[i].OriX),
+                                   &(WorkerDataFrames[i].OriY),
+                                   &(WorkerDataFrames[i].OriZ));
                 //I suppose it is possible that W,X,Y,Z do not get updated at the exact same moment.
+                //If the rotator is calculated from w,x,y,z in between then it'll be wrong.
+                //TODO: Use local floats then copy them all at once.
                 
                 // Get the controller button state
-                (*WorkerButtons)[i] = psmove_get_buttons(m_moves[i]);  // Bitwise, if each button is down.
-                psmove_get_button_events(m_moves[i], &( (*WorkerPressed)[i] ), &( (*WorkerReleased)[i] ));  // i.e., state change
+                WorkerDataFrames[i].Buttons = psmove_get_buttons(psmoves[i]);  // Bitwise; tells if each button is down.
+                psmove_get_button_events(psmoves[i], &WorkerDataFrames[i].Pressed, &WorkerDataFrames[i].Released);  // i.e., state change
                 
                 // Get the controller trigger value (uint8; 0-255)
-                uint8 temp = psmove_get_trigger(m_moves[i]);
-                (*WorkerTriggers)[i] = temp;
+                WorkerDataFrames[i].TriggerValue = psmove_get_trigger(psmoves[i]);
                 
                 // Set the controller rumble (uint8; 0-255)
-                psmove_set_rumble(m_moves[i], (*WorkerRumbleRequests)[i]);
+                psmove_set_rumble(psmoves[i], WorkerDataFrames[i].RumbleRequest);
             }
         }
 
         //Sleeping the thread seems to crash libusb.
         //FPlatformProcess::Sleep(0.005);
 
+    }
+    
+    // Delete the controllers
+    for (int i = 0; i<PSMoveCount; i++)
+    {
+        psmove_disconnect(psmoves[i]);
+    }
+    
+    // Delete the tracker
+    if (psmove_tracker)
+    {
+        psmove_tracker_free(psmove_tracker);
     }
 
     return 0;
@@ -190,14 +213,14 @@ void FPSMoveWorker::Stop()
     StopTaskCounter.Increment();
 }
 
-FPSMoveWorker* FPSMoveWorker::PSMoveWorkerInit(TArray<FVector>& PSMovePositions, TArray<FQuat>& PSMoveOrientations, TArray<uint32>& PSMoveButtons, TArray<uint32>& PSMovePressed, TArray<uint32>& PSMoveReleased, TArray<uint8>& PSMoveTriggers, TArray<uint8>& PSMoveRumbleRequests)
+FPSMoveWorker* FPSMoveWorker::PSMoveWorkerInit(TArray<FPSMoveRawDataFrame>* &PSMoveRawDataArrayPtr)
 {
     UE_LOG(LogPSMove, Log, TEXT("FPSMoveWorker::PSMoveWorkerInit"));
     if (!WorkerInstance && FPlatformProcess::SupportsMultithreading())
     {
         UE_LOG(LogPSMove, Log, TEXT("Creating new FPSMoveWorker instance."));
-        WorkerInstance = new FPSMoveWorker(PSMovePositions, PSMoveOrientations, PSMoveButtons, PSMovePressed, PSMoveReleased, PSMoveTriggers, PSMoveRumbleRequests);
-    } else {
+        WorkerInstance = new FPSMoveWorker(PSMoveRawDataArrayPtr);
+    } else if (WorkerInstance) {
         UE_LOG(LogPSMove, Log, TEXT("FPSMoveWorker already instanced."));
     }
     return WorkerInstance;

@@ -21,32 +21,9 @@ public:
     // PSMove controller ID - 0-based
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = PSMove)
     int32 PSMoveID;
-
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = PSMove)
-    FVector Position;
-
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = PSMove)
-    FRotator Rotation;
-    
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = PSMove)
-    bool TriangleDown;
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = PSMove)
-    bool CircleDown;
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = PSMove)
-    bool CrossDown;
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = PSMove)
-    bool SquareDown;
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = PSMove)
-    bool SelectDown;
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = PSMove)
-    bool StartDown;
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = PSMove)
-    bool PSDown;
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = PSMove)
-    bool MoveDown;
-    
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = PSMove)
-    uint8 TriggerValue;
+ 
+    UPROPERTY()
+    FPSMoveDataFrame DataFrame;
     
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = PSMove)
     uint8 RumbleRequest;

@@ -35,23 +35,20 @@ public:
         return FModuleManager::Get().IsModuleLoaded( "PSMove" );
     }
     
-    TArray<FVector> ModulePositions;
-    TArray<FQuat> ModuleOrientations;
-    TArray<uint32> ModuleButtons;
-    TArray<uint32> ModulePressed;
-    TArray<uint32> ModuleReleased;
-    TArray<uint8> ModuleTriggers;
-    TArray<uint8> ModuleRumbleRequests;
+    /**
+     * An array containing a reference to a raw data frame for each connected controller.
+     */
+    TArray<FPSMoveRawDataFrame>* ModuleRawDataArrayPtr;
     
     /**
      * Here we declare functions that will be accessed via the module instance from within the game.
      */
     virtual void InitWorker();
-    virtual const FVector GetPosition(uint8 PSMoveID) const;
-    virtual const FQuat GetOrientation(uint8 PSMoveID) const;
-    virtual const uint32 GetButtons(uint8 PSMoveID) const;
-    virtual const uint32 GetPressed(uint8 PSMoveID) const;
-    virtual const uint32 GetReleased(uint8 PSMoveID) const;
-    virtual const uint8 GetTrigger(uint8 PSMoveID) const;
-    virtual void SetRumble(uint8 PSMoveID, uint8 RumbleValue);
+    
+    /**
+     * A component passes in a (typically null) pointer to a raw data frame.
+     * This updates the pointer so it points to the same place as the module's raw data frame pointer for this ID
+     * i.e., it now points to the Worker's raw data frame.
+     */
+    virtual void  GetRawDataFramePtr(uint8 PSMoveID, FPSMoveRawDataFrame* &RawDataFramePtrOut);
 };

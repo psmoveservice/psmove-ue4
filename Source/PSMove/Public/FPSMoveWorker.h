@@ -10,23 +10,20 @@
 class FPSMoveWorker : public FRunnable
 {
 public:
-    FPSMoveWorker(TArray<FVector>& PSMovePositions, TArray<FQuat>& PSMoveOrientation, TArray<uint32>& PSMoveButtons, TArray<uint32>& PSMovePressed, TArray<uint32>& PSMoveReleased, TArray<uint8>& PSMoveTriggers, TArray<uint8>& PSMoveRumbleRequests); // Usually called by singleton access via Init
-    virtual ~FPSMoveWorker(); // Why is this virtual?
+    FPSMoveWorker(TArray<FPSMoveRawDataFrame>* &PSMoveRawDataArrayPtr); // Usually called by singleton access via Init
+    virtual ~FPSMoveWorker();
 
     /** Thread for polling the controller and tracker */
     FRunnableThread* Thread;
 
-    /** Ptrs to data containing position and orientation. Will be passed in creator. */
-    TArray<FQuat>* WorkerOrientations;
-    TArray<FVector>* WorkerPositions;
-    TArray<uint32>* WorkerButtons;
-    TArray<uint32>* WorkerPressed;
-    TArray<uint32>* WorkerReleased;
-    TArray<uint8>* WorkerTriggers;
-    TArray<uint8>* WorkerRumbleRequests;
-
     /** Thread Safe Counter. ?? */
     FThreadSafeCounter StopTaskCounter;
+    
+    /** An array of raw data strctures, one for each controller */
+    TArray<FPSMoveRawDataFrame> WorkerDataFrames;
+
+    /** Request the Worker check to see if the number of controllers has changed. */
+    void RequestMoveCheck();
 
     /** FRunnable Interface */
     virtual bool Init(); // override?
@@ -36,17 +33,14 @@ public:
     /** Singleton instance for static access. */
     static FPSMoveWorker* WorkerInstance;
     /** Static access to start the thread.*/
-    static FPSMoveWorker* PSMoveWorkerInit(TArray<FVector>& PSMovePositions, TArray<FQuat>& PSMoveOrientations, TArray<uint32>& PSMoveButtons, TArray<uint32>& PSMovePressed, TArray<uint32>& PSMoveReleased, TArray<uint8>& PSMoveTriggers, TArray<uint8>& PSMoveRumbleRequests);
+    static FPSMoveWorker* PSMoveWorkerInit(TArray<FPSMoveRawDataFrame>* &PSMoveRawDataArrayPtr);
     /** Static access to stop the thread.*/
     static void Shutdown();
 
 private:
-    /** Objects needed by the Thread
-     *  i.e., move_controllers and tracker
-     */
-    int m_move_count;
-    PSMove **m_moves;
-    PSMoveTracker *m_tracker;
-    float m_tracker_width;
-    float m_tracker_height;
+    /** We need a reference to the Module's RawDataArrayPtr because it will be passed in on initialization but not used until the Thread runs. */
+    TArray<FPSMoveRawDataFrame>** ModuleRawDataArrayPtrPtr;
+    uint8 PSMoveCount;
+    bool MoveCheckRequested;
+    bool UpdateMoveCount();
 };

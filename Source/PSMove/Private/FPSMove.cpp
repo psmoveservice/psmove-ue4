@@ -8,8 +8,9 @@ IMPLEMENT_MODULE( FPSMove, PSMove )
 
 void FPSMove::StartupModule()
 {
-    UE_LOG(LogPSMove, Log, TEXT("Loading PSMove module..."));
     // This code will execute after your module is loaded into memory (but after global variables are initialized, of course.)
+    UE_LOG(LogPSMove, Log, TEXT("Loading PSMove module..."));
+    ModuleRawDataArrayPtr = nullptr;
 }
 
 void FPSMove::ShutdownModule()
@@ -27,74 +28,17 @@ void FPSMove::InitWorker()
     // Init the PSMoveWorker singleton if needed.
     // This will also init the controllers and tracker if needed.
     UE_LOG(LogPSMove, Log, TEXT("Trying to initializing PSMoveWorker..."));
-    FPSMoveWorker::PSMoveWorkerInit(ModulePositions, ModuleOrientations, ModuleButtons, ModulePressed, ModuleReleased, ModuleTriggers, ModuleRumbleRequests);
+    FPSMoveWorker::PSMoveWorkerInit(ModuleRawDataArrayPtr);
 }
 
-const FVector FPSMove::GetPosition(uint8 PSMoveID) const
-{
-    if (ModulePositions.IsValidIndex(PSMoveID))
-    {
-        return ModulePositions[PSMoveID];
-    } else {
-        return FVector(0.0);
-    }
-}
 
-const FQuat FPSMove::GetOrientation(uint8 PSMoveID) const
+void  FPSMove::GetRawDataFramePtr(uint8 PSMoveID, FPSMoveRawDataFrame* &RawDataFramePtrOut)
 {
-    if (ModuleOrientations.IsValidIndex(PSMoveID))
+    if (ModuleRawDataArrayPtr && ModuleRawDataArrayPtr->IsValidIndex(PSMoveID))
     {
-        return ModuleOrientations[PSMoveID];
-    } else {
-        return FQuat(0.0, 0.0, 0.0, 1.0);
+        // De-reference the ptr to get the raw data frame array
+        // Then index it to get a specific raw data frame
+        // Then set the passed in pointer to its address.
+        RawDataFramePtrOut = &((*ModuleRawDataArrayPtr)[PSMoveID]);
     }
-}
-
-const uint32 FPSMove::GetButtons(uint8 PSMoveID) const
-{
-    if (ModuleButtons.IsValidIndex(PSMoveID))
-    {
-        return ModuleButtons[PSMoveID];
-    } else {
-        return 0;
-    }
-}
-
-const uint32 FPSMove::GetPressed(uint8 PSMoveID) const
-{
-    if (ModulePressed.IsValidIndex(PSMoveID))
-    {
-        return ModulePressed[PSMoveID];
-    } else {
-        return 0;
-    }
-}
-
-const uint32 FPSMove::GetReleased(uint8 PSMoveID) const
-{
-    if (ModuleReleased.IsValidIndex(PSMoveID))
-    {
-        return ModuleReleased[PSMoveID];
-    } else {
-        return 0;
-    }
-}
-
-const uint8 FPSMove::GetTrigger(uint8 PSMoveID) const
-{
-    if (ModuleTriggers.IsValidIndex(PSMoveID))
-    {
-        return ModuleTriggers[PSMoveID];
-    } else {
-        return 0;
-    }
-}
-
-void FPSMove::SetRumble(uint8 PSMoveID, uint8 RumbleValue)
-{
-    if (ModuleRumbleRequests.IsValidIndex(PSMoveID))
-    {
-        ModuleRumbleRequests[PSMoveID] = RumbleValue;
-    }
-    
 }
