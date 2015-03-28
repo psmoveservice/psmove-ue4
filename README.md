@@ -15,6 +15,7 @@ Working features:
 
 Planned features:
 
+- Use TThreadSafeSharedPtr
 - Zeroing position and orientation
 - Co-registration with HMD
 
@@ -27,7 +28,6 @@ Maybe someday features:
 
 # Setup
 
-This plugin requires the [PS3EYEDriver](https://github.com/cboulay/PS3EYEDriver/tree/psm_test) version of [psmoveapi](https://github.com/cboulay/psmoveapi).
 Plug your PS Eye camera into a USB port.
 
 ## OSX
@@ -44,9 +44,10 @@ In the future, you will only have to press the PS button to connect.
 
 ### Camera
 
-First, uninstall any driver you may have associated with the camera (the audio device can be left alone).
+First, open Control Panel and uninstall any driver you may have associated with the camera (the audio device can be left alone).
 Then, use [Zadig](http://zadig.akeo.ie/) to install the libusb0.sys version of the driver for the camera.
 (You may have to reboot at this point)
+Double click on ps3eye.reg to add a registry entry for it (I hope to get rid of this in the future).
 
 ### Controlller
 
@@ -74,8 +75,6 @@ mv psmove-ue4 PSMovePlugin
 ```
 
 In Windows command prompt, replace 'mv' with 'rename'.
-
-In Windows, copy psmoveapi.dll and psmoveapi_tracker.dll from `PSMovePlugin\ThirdParty\psmoveapi\lib\Win64` into the project's Binaries folder. e.g., `MyGame\Binaries\Win64`
 
 Then refresh your code (in Windows, right click on .uproject; in Mac, use File>Refresh XCode Project from within editor) and build your project.
 

@@ -36,7 +36,7 @@ public:
     }
     
     /**
-     * An array containing a reference to a raw data frame for each connected controller.
+     * A pointer to an array of raw data frames, one for each connected controller.
      */
     TArray<FPSMoveRawDataFrame>* ModuleRawDataArrayPtr;
     
