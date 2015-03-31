@@ -32,7 +32,7 @@ Plug your PS Eye camera into a USB port.
 
 ## OSX
 
-In the `ThirdParty\psmoveapi\lib\Mac` folder you'll find some tools.
+In the `Binaries\Mac` folder you'll find some tools.
 Plug your PSMove controller in to the computer via USB then run `psmovepair` to pair your PSMove controller to your computer.
 Then disconnect the USB cable and press the PS button on the controller to connect to the computer.
 Run `test_tracker` to test that the camera and controller are working properly.
@@ -45,7 +45,7 @@ In the future, you will only have to press the PS button to connect.
 ### Camera
 
 First, open Control Panel and uninstall any driver you may have associated with the camera (the audio device can be left alone).
-Then, use [Zadig](http://zadig.akeo.ie/) to install the libusb0.sys version of the driver for the camera.
+Then, use [Zadig](http://zadig.akeo.ie/) to install the libusb-win32 (libusb0.sys) version of the driver for the camera.
 (You may have to reboot at this point)
 Double click on ps3eye.reg to add a registry entry for it (I hope to get rid of this in the future).
 
@@ -53,7 +53,7 @@ Double click on ps3eye.reg to add a registry entry for it (I hope to get rid of 
 
 Getting the PSMove controller to pair and connect on Windows has traditionally been very difficult.
 There has been a lot of progress recently in improving this process, but it is not yet streamlined.
-In this repository's `ThirdParty\psmoveapi\lib\Win64` folder you will find some tools to help.
+In this repository's `Binaries\Win64` folder you will find some tools to help.
 
 Plug the controller into the computer via USB.
 First, run `psmovepair.exe` and follow the on-screen instructions. Chances are it will pair, but it won't connect.
