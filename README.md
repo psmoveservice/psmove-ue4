@@ -61,6 +61,12 @@ Then, run `psmove-pair-win.exe` to pair yet again, only this time it'll add some
 If you're still having trouble, try reading [this link](https://github.com/cboulay/psmoveapi/blob/master/WINDOWS_EXTRA)
 
 Once paired and connected, run `test_tracker` to verify that the camera and controller are working properly.
+If you find that test_tracker seems to start (i.e., the red LED turns on) but does not progress after that point,
+then you may have to try again with the camera in a different USB port.
+If you've tried every USB port and it still doesn't work, then try uninstalling the libusb driver
+(in Control Panel, right click on the device and uninstall. Be sure to check the box that says "Delete driver files.")
+then reinstall (using Zadig) with the WinUSB version of the driver (maybe reboot?) and try all the ports again.
+
 Then run `magnetometer_calibration` to calibrate the magnetometer.
 
 # Install
