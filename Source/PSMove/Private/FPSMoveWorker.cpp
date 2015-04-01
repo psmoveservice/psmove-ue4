@@ -110,7 +110,6 @@ uint32 FPSMoveWorker::Run()
     
     // Some variables we will need in the loop:
     float xpx, ypx, rpx;
-    float xcm, ycm, zcm;
     //float pr_conv = (M_PI/180.0) * (75.0/800.0); // 75 deg per 800 px
 
     //Initial wait before starting.
