@@ -26,48 +26,9 @@ Maybe someday features:
 - Controlling LEDs
 - Other camera types
 
-# Setup
+# Setup Hardware
 
-Plug your PS Eye camera into a USB port.
-
-## OSX
-
-In the `Binaries\Mac` folder you'll find some tools.
-Plug your PSMove controller in to the computer via USB then run `psmovepair` to pair your PSMove controller to your computer.
-Then disconnect the USB cable and press the PS button on the controller to connect to the computer.
-Run `test_tracker` to test that the camera and controller are working properly.
-Run `magnetometer_calibration` to calibrate the magnetometer.
-
-In the future, you will only have to press the PS button to connect.
-
-## Windows
-
-### Camera
-
-First, open Control Panel and uninstall any driver you may have associated with the camera (the audio device can be left alone).
-Then, use [Zadig](http://zadig.akeo.ie/) to install the libusb-win32 (libusb0.sys) version of the driver for the camera.
-(You may have to reboot at this point)
-Double click on ps3eye.reg to add a registry entry for it (I hope to get rid of this in the future).
-
-### Controlller
-
-Getting the PSMove controller to pair and connect on Windows has traditionally been very difficult.
-There has been a lot of progress recently in improving this process, but it is not yet streamlined.
-In this repository's `Binaries\Win64` folder you will find some tools to help.
-
-Plug the controller into the computer via USB.
-First, run `psmovepair.exe` and follow the on-screen instructions. Chances are it will pair, but it won't connect.
-Then, run `psmove-pair-win.exe` to pair yet again, only this time it'll add some additional settings that help with connecting.
-If you're still having trouble, try reading [this link](https://github.com/cboulay/psmoveapi/blob/master/WINDOWS_EXTRA)
-
-Once paired and connected, run `test_tracker` to verify that the camera and controller are working properly.
-If you find that test_tracker seems to start (i.e., the red LED turns on) but does not progress after that point,
-then you may have to try again with the camera in a different USB port.
-If you've tried every USB port and it still doesn't work, then try uninstalling the libusb driver
-(in Control Panel, right click on the device and uninstall. Be sure to check the box that says "Delete driver files.")
-then reinstall (using Zadig) with the WinUSB version of the driver (maybe reboot?) and try all the ports again.
-
-Then run `magnetometer_calibration` to calibrate the magnetometer.
+Read the [Wiki](https://github.com/cboulay/psmove-ue4/wiki).
 
 # Install
 
