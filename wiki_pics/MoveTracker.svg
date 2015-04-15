@@ -17,7 +17,7 @@
    version="1.1"
    inkscape:version="0.48.5 r10040"
    sodipodi:docname="MoveTracker.svg"
-   inkscape:export-filename="D:\SachsLab\Tools\VR\PSMove\psmove-ue4\wiki_pics\MoveTracker.png"
+   inkscape:export-filename="/Volumes/STORE/Tools/VR/PSMove/psmove-ue4/wiki_pics/MoveTracker.png"
    inkscape:export-xdpi="150.00789"
    inkscape:export-ydpi="150.00789">
   <defs
@@ -1788,7 +1788,7 @@
         <dc:format>image/svg+xml</dc:format>
         <dc:type
            rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
-        <dc:title />
+        <dc:title></dc:title>
       </cc:Work>
     </rdf:RDF>
   </metadata>
