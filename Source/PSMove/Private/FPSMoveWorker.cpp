@@ -107,14 +107,11 @@ uint32 FPSMoveWorker::Run()
             WorkerDataFrames[i].IsTracked = true;
         }
     }
-    
-    // Some variables we will need in the loop:
-    float xpx, ypx, rpx;
-    //float pr_conv = (M_PI/180.0) * (75.0/800.0); // 75 deg per 800 px
 
     //Initial wait before starting.
     FPlatformProcess::Sleep(0.03);
 
+    float xcm, ycm, zcm, oriw, orix, oriy, oriz;
     while (StopTaskCounter.GetValue() == 0 && PSMoveCount > 0)
     {
         if (MoveCheckRequested && UpdateMoveCount())
@@ -131,26 +128,20 @@ uint32 FPSMoveWorker::Run()
 
             for (int i = 0; i < PSMoveCount; i++)
             {
-                psmove_tracker_get_position(psmove_tracker, psmoves[i], &xpx, &ypx, &rpx);
+                psmove_tracker_get_location(psmove_tracker, psmoves[i], &xcm, &ycm, &zcm);
+                if (xcm)
+                {
+                    WorkerDataFrames[i].PosX = xcm;
+                }
+                if (ycm)
+                {
+                    WorkerDataFrames[i].PosY = ycm;
+                }
+                if (zcm)
+                {
+                    WorkerDataFrames[i].PosZ = zcm;
+                }
                 
-                //zero x and y on camera's principal axis
-                xpx = xpx - (tracker_width/2.0);  // Zero x on camera's principal axis
-                ypx = (tracker_height/2.0) - ypx;  // Zero y on camera's principal axis. Note that ypx starts as pixels from top.
-                
-                // Convert ball radius (in pixels) to ball distance in cm.
-                WorkerDataFrames[i].PosZ = psmove_tracker_distance_from_radius(psmove_tracker, rpx);  // Use Thomas' parametric fit to get depth in cm
-                //zcm = 2.25 / sin( pr_conv * rpx ); //Use trigonometry to get depth in cm
-                
-                // We know sphere radius = 2.25 cm, which gives us pixel->cm conversion factor at this depth.
-                WorkerDataFrames[i].PosX = xpx * 2.25 / rpx;
-                WorkerDataFrames[i].PosY = ypx * 2.25 / rpx;
-
-                /**
-                 * psmoveapi's fusion classes do the following to transform these results into coordinates:
-                 * projection = glm::perspectiveFov(fov, m_tracker_width, m_tracker_height, 0.1, 1000.0)
-                 * viewport = glm::vec4(0., 0., m_tracker_width, m_tracker_height);
-                 * modelview = glm::translate(glm::mat4(), glm::vec3(x, y, z)) * glm::mat4_cast(quaternion);
-                 */
             }
         } else {
             FPlatformProcess::Sleep(0.001);
@@ -167,13 +158,11 @@ uint32 FPSMoveWorker::Run()
                 
                 // Get the controller orientation (uses IMU).
                 psmove_get_orientation(psmoves[i],
-                                   &(WorkerDataFrames[i].OriW),
-                                   &(WorkerDataFrames[i].OriX),
-                                   &(WorkerDataFrames[i].OriY),
-                                   &(WorkerDataFrames[i].OriZ));
-                //I suppose it is possible that W,X,Y,Z do not get updated at the exact same moment.
-                //If the rotator is calculated from w,x,y,z in between then it'll be wrong.
-                //TODO: Use local floats then copy them all at once.
+                    &oriw, &orix, &oriy, &oriz);
+                WorkerDataFrames[i].OriW = oriw;
+                WorkerDataFrames[i].OriX = orix;
+                WorkerDataFrames[i].OriY = oriy;
+                WorkerDataFrames[i].OriZ = oriz;
                 
                 // Get the controller button state
                 WorkerDataFrames[i].Buttons = psmove_get_buttons(psmoves[i]);  // Bitwise; tells if each button is down.

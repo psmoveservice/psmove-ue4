@@ -471,10 +471,10 @@ ADDAPI PSMoveTrackerRGBImage
 ADDCALL psmove_tracker_get_image(PSMoveTracker *tracker);
 
 /**
- * \brief Get the current position and radius of a tracked controller
+ * \brief Get the current pixel position and radius of a tracked controller
  *
- * This function obtains the position and radius of a controller in the
- * camera image.
+ * This function obtains the pixel position and radius of a controller in the
+ * camera image. Radius is actually the length of the major ellipse axis.
  *
  * \param tracker A valid \ref PSMoveTracker handle
  * \param move A valid \ref PSMove handle
@@ -487,6 +487,24 @@ ADDCALL psmove_tracker_get_image(PSMoveTracker *tracker);
 ADDAPI int
 ADDCALL psmove_tracker_get_position(PSMoveTracker *tracker,
         PSMove *move, float *x, float *y, float *radius);
+
+/**
+* \brief Get the current 3D location of a tracked controller
+*
+* This function obtains the location of a controller in the
+* world in cm.
+*
+* \param tracker A valid \ref PSMoveTracker handle
+* \param move A valid \ref PSMove handle
+* \param xcm A pointer to store the X part of the location, or \c NULL
+* \param ycm A pointer to store the Y part of the location, or \c NULL
+* \param zcm A pointer to store the Z part of the location, or \c NULL
+*
+* \return The age of the sensor reading in milliseconds, or -1 on error
+**/
+ADDAPI int
+ADDCALL psmove_tracker_get_location(PSMoveTracker *tracker,
+        PSMove *move, float *xcm, float *ycm, float *zcm);
 
 /**
  * \brief Get the camera image size for the tracker
@@ -504,24 +522,6 @@ ADDCALL psmove_tracker_get_position(PSMoveTracker *tracker,
 ADDAPI void
 ADDCALL psmove_tracker_get_size(PSMoveTracker *tracker,
         int *width, int *height);
-
-/**
- * \brief Calculate the physical distance (in cm) of the controller
- *
- * Given the radius of the controller in the image (in pixels), this function
- * calculates the physical distance of the controller from the camera (in cm).
- *
- * By default, this function's parameters are set up for the PS Eye camera in
- * wide angle view. You can set different parameters using the function
- * psmove_tracker_set_distance_parameters().
- *
- * \param tracker A valid \ref PSMoveTracker handle
- * \param radius The radius for which the distance should be calculated, the
- *               radius is returned by psmove_tracker_get_position()
- **/
-ADDAPI float
-ADDCALL psmove_tracker_distance_from_radius(PSMoveTracker *tracker,
-        float radius);
 
 /**
  * \brief Set the parameters for the distance mapping function
