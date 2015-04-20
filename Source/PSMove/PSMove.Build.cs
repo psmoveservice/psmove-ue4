@@ -12,11 +12,11 @@ namespace UnrealBuildTool.Rules
             get { return Path.GetDirectoryName(RulesCompiler.GetModuleFilename(this.GetType().Name)); }
         }
         private string ThirdPartyPath{
-            get { return Path.GetFullPath(Path.Combine(ModulePath, "../../ThirdParty")); }
+            get { return Path.GetFullPath( Path.Combine(ModulePath, "..", "..", "ThirdParty") ); }
         }
         private string BinariesPath
         {
-            get { return Path.GetFullPath(Path.Combine(ModulePath, "../../Binaries/")); }
+            get { return Path.GetFullPath( Path.Combine(ModulePath, "..", "..", "Binaries") ); }
         }
         private string LibraryPath
         {

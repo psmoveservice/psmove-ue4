@@ -53,7 +53,7 @@ For example, from the default blank project:
 * Move the player start to -100, 0, 0
 * Move the floor to 0, 0, -100 
 * Create a cube
-    * Scale it to about 0.1, 0.1, 0.3
+    * Scale it to about 0.05, 0.2, 0.03
     * Move the cube to 0, 0, 0
     * Make the cube movable
 * To the cube, add a PSMove component.
