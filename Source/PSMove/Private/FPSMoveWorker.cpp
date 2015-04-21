@@ -163,6 +163,7 @@ uint32 FPSMoveWorker::Run()
                 WorkerDataFrames[i].OriX = orix;
                 WorkerDataFrames[i].OriY = oriy;
                 WorkerDataFrames[i].OriZ = oriz;
+                //UE_LOG(LogPSMove, Log, TEXT("Ori w,x,y,z: %f, %f, %f, %f"), oriw, orix, oriy, oriz);
                 
                 // Get the controller button state
                 WorkerDataFrames[i].Buttons = psmove_get_buttons(psmoves[i]);  // Bitwise; tells if each button is down.
