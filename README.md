@@ -68,4 +68,4 @@ For example, from the default blank project:
     * Connect the event Location to the Actor Location, and the event Rotation to the Actor Rotation. Also wire up the execution points.
 * Compile, save, Play!
 
-![BP example](https://github.com/cboulay/psmove-ue4/blob/master/bp.png)
+![BP example](https://github.com/cboulay/psmove-ue4/blob/master/wiki_pics/bp.png)
