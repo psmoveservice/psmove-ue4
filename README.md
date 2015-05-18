@@ -59,9 +59,11 @@ For example, from the default blank project:
 * To the cube, add a PSMove component.
     * At this point, you can specify the PSMove ID (controller number), or you can do it from Blueprints later.
 * When the Cube is selected, click on the Blueprint/Add Script button.
+    * Name the blurprint class (default Cube_Blueprint is fine)
     * At this point, the camera will turn on and the controller will flash to set its brightness.
     * Make sure the controller is on and in view of the camera. I find it works best from about 2 m away.
 * Edit the blueprint as in the image below
+    * At the top of the blueprint editor, change to the "Event Graph" tab.
     * On the left of the blueprint editor, click on the PSMove component to select it.
     * On the right of the blueprint editor, click on the + next to the event you want to use, e.g., On Data Updated event.
     * Create a node for Set Actor Location and Rotation
