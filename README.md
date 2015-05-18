@@ -30,7 +30,10 @@ Maybe someday features:
 
 Read the [Wiki](https://github.com/cboulay/psmove-ue4/wiki).
 
-# Install
+# Install & Use
+
+For the latest version of the following contents,
+see [this wiki page](https://github.com/cboulay/psmove-ue4/wiki/Use-the-PSMove-plugin-in-a-UE4-project).
 
 Change to your project directory (must be a project with C++ code).
 
@@ -71,3 +74,5 @@ For example, from the default blank project:
 * Compile, save, Play!
 
 ![BP example](https://github.com/cboulay/psmove-ue4/blob/master/bp.png)
+
+

@@ -111,15 +111,9 @@ struct FPSMoveDataFrame
     {
         if (RawDataPtr && RawDataPtr->IsConnected)
         {
-            //FQuat myQuat = FQuat(RawDataPtr->OriX, RawDataPtr->OriY, RawDataPtr->OriZ, RawDataPtr->OriW);
-            //FVector myEulerAngles = myQuat.Euler();
-            //myEulerAngles.Z *= -1;
-            //return FRotator::MakeFromEuler(myEulerAngles);
-            
-            //FQuat myQuat = FQuat(0, 0, sqrt(2.0) / 2, sqrt(2.0) / 2) * FQuat(RawDataPtr->OriX, RawDataPtr->OriY, RawDataPtr->OriZ, RawDataPtr->OriW);
-            //return myQuat.Rotator();
-
+            //return FQuat(-RawDataPtr->OriX, RawDataPtr->OriY, -RawDataPtr->OriZ, RawDataPtr->OriW).Rotator();
             return FQuat(RawDataPtr->OriX, RawDataPtr->OriY, RawDataPtr->OriZ, RawDataPtr->OriW).Rotator();
+
         } else {
             return FRotator(0.0);
         }

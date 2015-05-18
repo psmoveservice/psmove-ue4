@@ -524,28 +524,6 @@ ADDCALL psmove_tracker_get_size(PSMoveTracker *tracker,
         int *width, int *height);
 
 /**
- * \brief Set the parameters for the distance mapping function
- *
- * This function sets the parameters for the Pearson VII distribution
- * function that's used to map radius values to distance values in
- * psmove_tracker_distance_from_radius(). By default, the parameters are
- * set up so that they work well for a PS Eye camera in wide angle mode.
- *
- * The function is defined as in: http://fityk.nieto.pl/model.html
- *
- * distance = height / ((1+((radius-center)/hwhm)^2 * (2^(1/shape)-1)) ^ shape)
- *
- * \param tracker A valid \ref PSMoveTracker handle
- * \param height The height parameter of the Pearson VII distribution
- * \param center The center parameter of the Pearson VII distribution
- * \param hwhm The hwhm parameter of the Pearson VII distribution
- * \param shape The shape parameter of the Pearson VII distribution
- **/
-ADDAPI void
-ADDCALL psmove_tracker_set_distance_parameters(PSMoveTracker *tracker,
-        float height, float center, float hwhm, float shape);
-
-/**
  * \brief Destroy an existing tracker instance and free allocated resources
  *
  * This will shut down the tracker, clean up all state information for

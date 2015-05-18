@@ -1027,6 +1027,24 @@ ADDCALL psmove_get_orientation(PSMove *move,
 ADDAPI void
 ADDCALL psmove_reset_orientation(PSMove *move);
 
+/**
+ * \brief Get the Euler angles of the controller.
+ *
+ * This will get the current x,y,z Euler angles of the controller.
+ * You will have to call psmove_poll() regularly to have good quality data.
+ *
+ * In order for this to work, you have to enable orienation and have an IMU
+ * sensor fusion algorithm enabled (i.e., Madgwick). You can use
+ * psmove_has_orientation() to check if all preocnditions are met.
+ *
+ * \param move A valid \ref PSMove handle
+ * \param xAngle A pointer to store the xAngle
+ * \param yAngle A pointer to store the yAngle
+ * \param zAngle A pointer to store the zAngle
+ **/
+ADDAPI void
+ADDCALL psmove_get_angles(PSMove *move, float *xAngle, float *yAngle, float *zAngle);
+
 
 /**
  * \brief Reset the magnetometer calibration state.
