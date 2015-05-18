@@ -111,7 +111,8 @@ struct FPSMoveDataFrame
     {
         if (RawDataPtr && RawDataPtr->IsConnected)
         {
-            return FQuat(-RawDataPtr->OriX, RawDataPtr->OriY, -RawDataPtr->OriZ, RawDataPtr->OriW).Rotator();
+            //return FQuat(-RawDataPtr->OriX, RawDataPtr->OriY, -RawDataPtr->OriZ, RawDataPtr->OriW).Rotator();
+            return FQuat(RawDataPtr->OriX, RawDataPtr->OriY, RawDataPtr->OriZ, RawDataPtr->OriW).Rotator();
 
         } else {
             return FRotator(0.0);
