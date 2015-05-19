@@ -43,5 +43,6 @@ void UPSMoveComponent::TickComponent( float DeltaTime, ELevelTick TickType, FAct
         
         // Rumble
         DataFrame.SetRumbleRequest(RumbleRequest);
+        DataFrame.SetResetPoseRequest(ResetPoseRequest);
     }
 }

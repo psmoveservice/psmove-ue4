@@ -58,6 +58,9 @@ struct FPSMoveRawDataFrame
     
     UPROPERTY()
     uint8 RumbleRequest;
+
+    UPROPERTY()
+    bool ResetPoseRequest;
     
     UPROPERTY()
     bool IsConnected;
@@ -82,6 +85,7 @@ struct FPSMoveRawDataFrame
         Released = 0;
         TriggerValue = 0;
         RumbleRequest = 0;
+        ResetPoseRequest = false;
         IsConnected = false;
         IsTracked = false;
     }
@@ -213,6 +217,14 @@ struct FPSMoveDataFrame
         if (RawDataPtr && RawDataPtr->IsConnected)
         {
             RawDataPtr->RumbleRequest = RequestedRumbleValue;
+        }
+    }
+
+    void SetResetPoseRequest(bool AskForPoseReset)
+    {
+        if (RawDataPtr && RawDataPtr->IsConnected && !(RawDataPtr->ResetPoseRequest == AskForPoseReset))
+        {
+            RawDataPtr->ResetPoseRequest = AskForPoseReset;
         }
     }
     

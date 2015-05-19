@@ -507,6 +507,16 @@ ADDCALL psmove_tracker_get_location(PSMoveTracker *tracker,
         PSMove *move, float *xcm, float *ycm, float *zcm);
 
 /**
+* \brief Rest the location offsets to the current location
+*
+* \param tracker A valid \ref PSMoveTracker handle
+* \param move A valid \ref PSMove handle
+*
+**/
+ADDAPI void
+ADDCALL psmove_tracker_reset_location(PSMoveTracker *tracker, PSMove *move);
+
+/**
  * \brief Get the camera image size for the tracker
  *
  * This function can be used to obtain the real camera image size used

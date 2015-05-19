@@ -28,6 +28,9 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = PSMove)
     uint8 RumbleRequest;
 
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = PSMove)
+    bool ResetPoseRequest;
+
     // Delegate triggered once per frame update
     UPROPERTY(BlueprintAssignable, Category = PSMove)
     FPSMoveDataUpdatedDelegate OnDataUpdated;

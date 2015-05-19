@@ -141,6 +141,11 @@ uint32 FPSMoveWorker::Run()
                 {
                     WorkerDataFrames[i].PosZ = zcm;
                 }
+
+                if (WorkerDataFrames[i].ResetPoseRequest)
+                {
+                    psmove_tracker_reset_location(psmove_tracker, psmoves[i]);
+                }
                 
             }
         } else {
@@ -175,11 +180,17 @@ uint32 FPSMoveWorker::Run()
                 // Set the controller rumble (uint8; 0-255)
                 psmove_set_rumble(psmoves[i], WorkerDataFrames[i].RumbleRequest);
             }
+            if (WorkerDataFrames[i].ResetPoseRequest)
+            {
+                psmove_reset_orientation(psmoves[i]);
+                WorkerDataFrames[i].ResetPoseRequest = false;  // Might not be thread safe?
+            }
         }
 
         //Sleeping the thread seems to crash libusb.
         //FPlatformProcess::Sleep(0.005);
 
+        
     }
     
     // Delete the controllers
