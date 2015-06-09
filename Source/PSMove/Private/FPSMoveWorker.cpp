@@ -129,15 +129,15 @@ uint32 FPSMoveWorker::Run()
             for (int i = 0; i < PSMoveCount; i++)
             {
                 psmove_tracker_get_location(psmove_tracker, psmoves[i], &xcm, &ycm, &zcm);
-                if (xcm)
+                if (xcm && xcm==xcm)
                 {
                     WorkerDataFrames[i].PosX = xcm;
                 }
-                if (ycm)
+                if (ycm && ycm==ycm)
                 {
                     WorkerDataFrames[i].PosY = ycm;
                 }
-                if (zcm)
+                if (zcm && zcm==zcm)
                 {
                     WorkerDataFrames[i].PosZ = zcm;
                 }
