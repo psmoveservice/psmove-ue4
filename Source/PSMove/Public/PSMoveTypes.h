@@ -105,7 +105,8 @@ struct FPSMoveDataFrame
     {
         if (RawDataPtr && RawDataPtr->IsTracked)
         {
-          return FVector(-RawDataPtr->PosZ, -RawDataPtr->PosX, RawDataPtr->PosY);
+            //UE_LOG(LogTemp, Log, TEXT("X: %f, Y: %f, Z: %f"), -RawDataPtr->PosZ, -RawDataPtr->PosX, RawDataPtr->PosY);
+            return FVector(-RawDataPtr->PosZ, -RawDataPtr->PosX, RawDataPtr->PosY);
         } else {
             return FVector(0.0);
         }

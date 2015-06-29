@@ -78,7 +78,7 @@ uint32 FPSMoveWorker::Run()
         psmove_tracker_set_exposure(psmove_tracker, Exposure_MEDIUM);  //Exposure_LOW, Exposure_MEDIUM, Exposure_HIGH
         
         psmove_tracker_get_size(psmove_tracker, &tracker_width, &tracker_height);
-        UE_LOG(LogPSMove, Log, TEXT("Camera Dimensions: %f x %f"), tracker_width, tracker_height);
+        UE_LOG(LogPSMove, Log, TEXT("Camera Dimensions: %d x %d"), tracker_width, tracker_height);
     }
     else {
         UE_LOG(LogPSMove, Log, TEXT("PSMove tracker failed to initialize."));
@@ -129,19 +129,19 @@ uint32 FPSMoveWorker::Run()
             for (int i = 0; i < PSMoveCount; i++)
             {
                 psmove_tracker_get_location(psmove_tracker, psmoves[i], &xcm, &ycm, &zcm);
-                if (xcm)
+                if (xcm && !isnan(xcm) && xcm==xcm)
                 {
                     WorkerDataFrames[i].PosX = xcm;
                 }
-                if (ycm)
+                if (ycm && !isnan(ycm))
                 {
                     WorkerDataFrames[i].PosY = ycm;
                 }
-                if (zcm)
+                if (zcm && !isnan(zcm))
                 {
                     WorkerDataFrames[i].PosZ = zcm;
                 }
-
+                //UE_LOG(LogPSMove, Log, TEXT("X: %f, Y: %f, Z: %f"), xcm, ycm, zcm);
                 if (WorkerDataFrames[i].ResetPoseRequest)
                 {
                     psmove_tracker_reset_location(psmove_tracker, psmoves[i]);
