@@ -129,16 +129,10 @@ uint32 FPSMoveWorker::Run()
             for (int i = 0; i < PSMoveCount; i++)
             {
                 psmove_tracker_get_location(psmove_tracker, psmoves[i], &xcm, &ycm, &zcm);
-                if (xcm && !isnan(xcm) && xcm==xcm)
+                if (xcm && ycm && zcm && !isnan(xcm) && !isnan(ycm) && !isnan(zcm) && xcm==xcm && ycm==ycm && zcm==zcm)
                 {
                     WorkerDataFrames[i].PosX = xcm;
-                }
-                if (ycm && !isnan(ycm))
-                {
                     WorkerDataFrames[i].PosY = ycm;
-                }
-                if (zcm && !isnan(zcm))
-                {
                     WorkerDataFrames[i].PosZ = zcm;
                 }
                 //UE_LOG(LogPSMove, Log, TEXT("X: %f, Y: %f, Z: %f"), xcm, ycm, zcm);
