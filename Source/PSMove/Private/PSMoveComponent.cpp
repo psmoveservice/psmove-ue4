@@ -41,7 +41,6 @@ void UPSMoveComponent::TickComponent( float DeltaTime, ELevelTick TickType, FAct
         OnMoveButton.Broadcast(DataFrame.GetButtonMove());
         OnTriggerButton.Broadcast(DataFrame.GetTriggerValue());
         
-        // Rumble
         DataFrame.SetRumbleRequest(RumbleRequest);
         DataFrame.SetResetPoseRequest(ResetPoseRequest);
     }

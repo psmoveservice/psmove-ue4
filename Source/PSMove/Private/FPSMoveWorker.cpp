@@ -10,6 +10,7 @@
 #include "FPSMove.h"
 #include <math.h>
 #include <assert.h>
+#include "OVR_CAPI.h"
 
     //
 FPSMoveWorker* FPSMoveWorker::WorkerInstance = NULL;
@@ -65,9 +66,10 @@ uint32 FPSMoveWorker::Run()
     
     // Initialize an empty array of psmove controllers
     TArray<PSMove*> psmoves;
-    
+
     // Initialize and configure the psmove_tracker
     PSMoveTracker *psmove_tracker = psmove_tracker_new(); // Unfortunately the API does not have a way to change the resolution and framerate.
+    PSMoveFusion *psmove_fusion = psmove_fusion_new(psmove_tracker, 1., 1000.);
     int tracker_width = 640;
     int tracker_height = 480;
     if (psmove_tracker)
@@ -108,6 +110,47 @@ uint32 FPSMoveWorker::Run()
         }
     }
 
+    FTransform addedTransform;
+
+    //TEMP Initialize OVR
+    ovrBool ovrresult;
+    ovrHmd HMD;
+    ovrTrackingState dk2state;
+    ovrresult = ovr_Initialize(0);
+    ovrHmd_Create(0, &HMD);
+    ovrresult = ovrHmd_ConfigureTracking(HMD,
+        ovrTrackingCap_Orientation |
+        ovrTrackingCap_MagYawCorrection |
+        ovrTrackingCap_Position, 0);
+    dk2state = ovrHmd_GetTrackingState(HMD, 0.0);
+
+    // Convert dk2state.CameraPose to a 4x4 matrix, then to a float[16].
+    float add_xf_arr[16] = { 0.5414, 0.5718, 0.6164, 0, -0.6008, 0.7760, -0.1921, 0, -0.5881, -0.2664, 0.7636, 0, 1.7955, -14.5762, -86.8742, 1.000 };
+    /*
+    addedTransform.SetComponents(
+        FQuat(dk2state.CameraPose.Orientation.x, dk2state.CameraPose.Orientation.y, dk2state.CameraPose.Orientation.z, dk2state.CameraPose.Orientation.w),
+        FVector(100.0*dk2state.CameraPose.Position.x, 100.0*dk2state.CameraPose.Position.y, 100.0*dk2state.CameraPose.Position.z),
+        FVector(1.0, 1.0, 1.0));
+    FMatrix addedMatrix = addedTransform.ToMatrixWithScale();
+    int col_ix;
+    float add_xf_arr[16] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1.000 };
+    for (col_ix = 0; col_ix < 4; col_ix++)
+    {
+        add_xf_arr[col_ix * 4 + 0] = addedMatrix.GetColumn(col_ix).X;
+        add_xf_arr[col_ix * 4 + 1] = addedMatrix.GetColumn(col_ix).Y;
+        add_xf_arr[col_ix * 4 + 2] = addedMatrix.GetColumn(col_ix).Z;
+    }
+    */
+    psmove_fusion_update_transform(psmove_fusion, add_xf_arr);
+    printf("\t Fusion total transform:\n");
+    float* xf_arr = psmove_fusion_get_transform_matrix(psmove_fusion);
+    int el;
+    for (el = 0; el < 16; el++)
+    {
+        UE_LOG(LogPSMove, Log, TEXT("xf_arr %f"), xf_arr[el]);
+    }
+    printf("\n");
+
     //Initial wait before starting.
     FPlatformProcess::Sleep(0.03);
 
@@ -128,19 +171,19 @@ uint32 FPSMoveWorker::Run()
 
             for (int i = 0; i < PSMoveCount; i++)
             {
-                psmove_tracker_get_location(psmove_tracker, psmoves[i], &xcm, &ycm, &zcm);
+                psmove_fusion_get_transformed_position(psmove_fusion, psmoves[i], &xcm, &ycm, &zcm);
                 if (xcm && ycm && zcm && !isnan(xcm) && !isnan(ycm) && !isnan(zcm) && xcm==xcm && ycm==ycm && zcm==zcm)
                 {
                     WorkerDataFrames[i].PosX = xcm;
                     WorkerDataFrames[i].PosY = ycm;
                     WorkerDataFrames[i].PosZ = zcm;
                 }
+
                 //UE_LOG(LogPSMove, Log, TEXT("X: %f, Y: %f, Z: %f"), xcm, ycm, zcm);
                 if (WorkerDataFrames[i].ResetPoseRequest)
                 {
                     psmove_tracker_reset_location(psmove_tracker, psmoves[i]);
                 }
-                
             }
         } else {
             FPlatformProcess::Sleep(0.001);

@@ -61,7 +61,7 @@ struct FPSMoveRawDataFrame
 
     UPROPERTY()
     bool ResetPoseRequest;
-    
+
     UPROPERTY()
     bool IsConnected;
     
@@ -228,7 +228,7 @@ struct FPSMoveDataFrame
             RawDataPtr->ResetPoseRequest = AskForPoseReset;
         }
     }
-    
+
     FPSMoveDataFrame()
     {
         PSMoveID = -1;
