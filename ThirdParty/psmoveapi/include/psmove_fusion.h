@@ -60,14 +60,14 @@ typedef struct _PSMoveFusion PSMoveFusion; /*!< Handle to a PS Move Fusion objec
  *
  * Creates and returns a new \ref PSMoveFusion object.
  *
- * \param fusion A valid \ref PSMoveFusion handle
- * \param added_xf_16_arr A pointer to a 16-item (4x4) float array
- *                        representing the column-major transform
- *                        to be multiplied with the ever-present
- *                        physical transform
+ * \param fusion     A valid \ref PSMoveFusion handle
+ * \param pos_xyz    A pointer to a float[3] array representing the
+ *                   additional transform translation
+ * \param quat_wxyz  A pointer to a float[4] array representing the
+ *                   additional transform quaternion
  **/
 ADDAPI void
-ADDCALL psmove_fusion_update_transform(PSMoveFusion *fusion, float *added_xf_16_arr);
+ADDCALL psmove_fusion_update_transform(PSMoveFusion *fusion, float *pos_xyz, float *quat_wxyz);
 
 /**
  * \brief Create a new PS Move Fusion object
