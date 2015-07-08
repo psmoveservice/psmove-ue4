@@ -105,10 +105,21 @@ struct FPSMoveDataFrame
     {
         if (RawDataPtr && RawDataPtr->IsTracked)
         {
-            //UE_LOG(LogTemp, Log, TEXT("X: %f, Y: %f, Z: %f"), -RawDataPtr->PosZ, -RawDataPtr->PosX, RawDataPtr->PosY);
-            return FVector(-RawDataPtr->PosZ, -RawDataPtr->PosX, RawDataPtr->PosY);
+            return FVector(RawDataPtr->PosX, RawDataPtr->PosY, RawDataPtr->PosZ);
         } else {
             return FVector(0.0);
+        }
+    }
+
+    FQuat GetOrientation()
+    {
+        if (RawDataPtr && RawDataPtr->IsConnected)
+        {
+            return FQuat(-RawDataPtr->OriX, RawDataPtr->OriY, RawDataPtr->OriZ, -RawDataPtr->OriW);
+
+        }
+        else {
+            return FQuat::Identity;
         }
     }
     

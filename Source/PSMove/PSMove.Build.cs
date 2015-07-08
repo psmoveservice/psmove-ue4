@@ -37,7 +37,7 @@ namespace UnrealBuildTool.Rules
                 new string[] {
                     "PSMove/Private",
                     Path.Combine(ThirdPartyPath, "psmoveapi", "include"),
-                    Path.Combine(ThirdPartyPath, "LibOVR", "Win_0.6.0.1", "Include"),
+                    //Path.Combine(ThirdPartyPath, "LibOVR", "Win_0.6.0.1", "Include"),
                     // ... add other private include paths required here ...
                 }
             );
@@ -49,7 +49,8 @@ namespace UnrealBuildTool.Rules
                     "Core",
                     "CoreUObject",          // Actors and Structs
                     "InputCore",            // Provides LOCTEXT and other Input features
-                    "HeadMountedDisplay"    // Eventually we may want to have the plugin contain its own calibration methods.
+                    "HeadMountedDisplay",    // Eventually we may want to have the plugin contain its own calibration methods.
+                    //"OculusRift", // Should be loaded dynamically
                     // ... add other public dependencies that you statically link with here ...
                 }
             );
@@ -84,7 +85,7 @@ namespace UnrealBuildTool.Rules
                 PublicAdditionalLibraries.Add(Path.Combine(LibraryPath, PlatformString, "psmoveapi_tracker.lib"));
                 // Temporarily adding LibOVR so I can get camera position (until UE4 is fixed).
                 OVPlatformString = (Target.Platform == UnrealTargetPlatform.Win64) ? "x64" : "Win32";
-                PublicAdditionalLibraries.Add(Path.Combine(ThirdPartyPath, "LibOVR", "Win_0.6.0.1", "Lib", "Windows", OVPlatformString, "Release", "VS2013", "LibOVR.lib"));
+                //PublicAdditionalLibraries.Add(Path.Combine(ThirdPartyPath, "LibOVR", "Win_0.6.0.1", "Lib", "Windows", OVPlatformString, "Release", "VS2013", "LibOVR.lib"));
                 //FPlatformProcess::PushDllDirectory() ???
                 //FPlatformProcess::GetDllHandle() ???
                 //PublicDelayLoadDLLs ???

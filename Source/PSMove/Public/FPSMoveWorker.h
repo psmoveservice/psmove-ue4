@@ -6,6 +6,7 @@
 //  Copyright (c) 2015 EpicGames. All rights reserved.
 //
 #pragma once
+#include "PSMovePrivatePCH.h"
 
 class FPSMoveWorker : public FRunnable
 {

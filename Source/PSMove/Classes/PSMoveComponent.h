@@ -30,6 +30,15 @@ public:
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = PSMove)
     bool ResetPoseRequest;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = PSMove)
+    bool UseHMDCorrection;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = PSMove)
+    FRotator ViewRotation;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = PSMove)
+    FVector ViewLocation;
     
     // Delegate triggered once per frame update
     UPROPERTY(BlueprintAssignable, Category = PSMove)

@@ -10,8 +10,6 @@
 #include "FPSMove.h"
 #include <math.h>
 #include <assert.h>
-#include "Runtime/HeadMountedDisplay/Public/HeadMountedDisplay.h"
-//#include "OVR_CAPI.h"
 
     //
 FPSMoveWorker* FPSMoveWorker::WorkerInstance = NULL;
@@ -100,6 +98,8 @@ uint32 FPSMoveWorker::Run()
         
         if (psmove_tracker)
         {
+            psmove_tracker_set_mirror(psmove_tracker, PSMove_True);
+
             while (psmove_tracker_enable(psmove_tracker, psmoves[i]) != Tracker_CALIBRATED); // Keep attempting to enable.
             
             //TODO: psmove_tracker_enable_with_color(psmove_tracker, psmoves[i], r, g, b)
@@ -110,63 +110,6 @@ uint32 FPSMoveWorker::Run()
             WorkerDataFrames[i].IsTracked = true;
         }
     }
-
-    /*
-    The best we can do with simple coregistration is get the PSMove position in VR camera coordinate system.
-    If we know the VR camera pose in a similar RHS, and how to transform that to the UE4 game world, then we
-    can similarly transform the PSMove position through the VR camera pose then the additional transforms to game world.
-
-    How the Oculus plugin gets the camera pose in game-world coordinates
-    https://github.com/EpicGames/UnrealEngine/blob/release/Engine/Plugins/Runtime/OculusRift/Source/OculusRift/Private/HeadMountedDisplayCommon.cpp#L1057-L1086
-    (1) Gets the camera pose in UE4 coordinate system
-        GetPositionalTrackingCameraProperties(origin, orient, hfovDeg, vfovDeg, cameraDist, nearPlane, farPlane);  https://github.com/EpicGames/UnrealEngine/blob/release/Engine/Plugins/Runtime/OculusRift/Source/OculusRift/Private/OculusRiftHMD.cpp#L235
-            Get the pose from the API
-            FGameFrame::PoseToOrientationAndPosition(cameraPose, Orient, Pos); https://github.com/EpicGames/UnrealEngine/blob/release/Engine/Plugins/Runtime/OculusRift/Source/OculusRift/Private/OculusRiftHMD.cpp#L297
-                Converts position to the correct scale, subtracts off the frame->BaseOffset, and scales by CameraScale3D
-                Rotates Position through Settings->BaseOrientation.Inverse()
-                OutOrientation = Settings->BaseOrientation.Inverse() * OutOrientation
-                OutOrientation.Normalize();
-    (2) Corrects the camera pose by the head pose
-    */
-    
-    if (GEngine->HMDDevice.IsValid())
-    {
-        FVector origin;
-        FQuat orient;
-        float hfovDeg, vfovDeg, nearPlane, farPlane, cameraDist;
-        GEngine->HMDDevice->GetPositionalTrackingCameraProperties(origin, orient, hfovDeg, vfovDeg, cameraDist, nearPlane, farPlane);       
-    }
-
-    /*
-
-    //TEMP Initialize OVR
-    ovrBool ovrresult;
-    ovrHmd HMD;
-    ovrTrackingState dk2state;
-    ovrresult = ovr_Initialize(0);
-    ovrHmd_Create(0, &HMD);
-    ovrresult = ovrHmd_ConfigureTracking(HMD,
-        ovrTrackingCap_Orientation |
-        ovrTrackingCap_MagYawCorrection |
-        ovrTrackingCap_Position, 0);
-    dk2state = ovrHmd_GetTrackingState(HMD, 0.0);
-
-    FQuat camQuat(dk2state.CameraPose.Orientation.x, dk2state.CameraPose.Orientation.y, dk2state.CameraPose.Orientation.z, dk2state.CameraPose.Orientation.w);
-    FVector camPos(100.0*dk2state.CameraPose.Position.x, 100.0*dk2state.CameraPose.Position.y, 100.0*dk2state.CameraPose.Position.z);
-
-    float add_xf_q[4] = { camQuat.W, camQuat.X, camQuat.Y, camQuat.Z };
-    float add_xf_p[3] = { camPos.X, camPos.Y, camPos.Z };
-    */
-
-    psmove_fusion_update_transform(psmove_fusion, add_xf_p, add_xf_q);
-    printf("\t Fusion total transform:\n");
-    float* xf_arr = psmove_fusion_get_transform_matrix(psmove_fusion);
-    int el;
-    for (el = 0; el < 16; el++)
-    {
-        UE_LOG(LogPSMove, Log, TEXT("xf_arr %f"), xf_arr[el]);
-    }
-    printf("\n");
 
     //Initial wait before starting.
     FPlatformProcess::Sleep(0.03);
@@ -182,13 +125,19 @@ uint32 FPSMoveWorker::Run()
         // Get positional data from tracker
         if (psmove_tracker)
         {
+
             // Renew the image on camera
             psmove_tracker_update_image(psmove_tracker); // Sometimes libusb crashes here.
             psmove_tracker_update(psmove_tracker, NULL); // Passing null (instead of m_moves[i]) updates all controllers.
 
             for (int i = 0; i < PSMoveCount; i++)
             {
+                //psmove_tracker_get_location(psmove_tracker, psmoves[i], &xcm, &ycm, &zcm);
+                //UE_LOG(LogPSMove, Log, TEXT("Raw: %f, %f, %f"), xcm, ycm, zcm);
+
                 psmove_fusion_get_transformed_position(psmove_fusion, psmoves[i], &xcm, &ycm, &zcm);
+                //UE_LOG(LogPSMove, Log, TEXT("Transformed: %f, %f, %f"), xcm, ycm, zcm);
+
                 if (xcm && ycm && zcm && !isnan(xcm) && !isnan(ycm) && !isnan(zcm) && xcm==xcm && ycm==ycm && zcm==zcm)
                 {
                     WorkerDataFrames[i].PosX = xcm;
