@@ -36,7 +36,7 @@ void UPSMoveComponent::TickComponent( float DeltaTime, ELevelTick TickType, FAct
         FMatrix camMat = FMatrix::Identity;
         FVector HeadPosition(0.0);
         FQuat DeltaControlOrientation = FQuat::Identity;
-        if (GEngine->HMDDevice.IsValid() && GEngine->HMDDevice->IsHMDEnabled())
+        if (UseHMDCorrection && GEngine->HMDDevice.IsValid() && GEngine->IsStereoscopic3D())
         {
             BaseOffset = GEngine->HMDDevice->GetBaseOffset();
             BaseOrientation = GEngine->HMDDevice->GetBaseOrientation();
