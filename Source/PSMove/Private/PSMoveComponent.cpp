@@ -31,17 +31,32 @@ void UPSMoveComponent::TickComponent( float DeltaTime, ELevelTick TickType, FAct
         // TODO: Check to see if it is necessary to update the DataFrame.RawDataPtr
         //FPSMove::Get().GetRawDataFramePtr(PSMoveID, DataFrame.RawDataPtr);
 
-        FVector BaseOffset(0.0);
-        FQuat BaseOrientation = FQuat::Identity;
-        FMatrix camMat = FMatrix::Identity;
-        FVector HeadPosition(0.0);
-        FQuat DeltaControlOrientation = FQuat::Identity;
-        if (UseHMDCorrection && GEngine->HMDDevice.IsValid() && GEngine->IsStereoscopic3D())
-        {
-            BaseOffset = GEngine->HMDDevice->GetBaseOffset();
-            BaseOrientation = GEngine->HMDDevice->GetBaseOrientation();
+        // Get the raw PSMove position and quaternion
+        FVector PSMPos = DataFrame.GetPosition();
+        FQuat PSMOri = DataFrame.GetOrientation();
 
-            // Get the camera pose and transform it back into Oculus space.
+        /*
+        There are several steps needed to go from the PSMove reference frame to the game world reference frame.
+        How we do this depends on whether or not the user is using a VR HMD.
+        */
+        
+        if (UseHMDCorrection && GEngine->HMDDevice.IsValid())
+        {
+            /*
+            If an HMD is present and enabled, then assume that the PSMove coordinates
+            are being returned in the the HMD_camera reference frame.
+            The reason for using the HMD_camera and not the HMD_proper
+            is that the physical relationship between the PSEye camera and the
+            HMD_camera will change infrequently, but the relationship between the
+            PSEye and the HMD_proper will change whenever the user recenters the pose.
+
+            HMD_camera in HMD_CS -> HMD_native in HMD_CS -> HMD_native in UE4_CS -> HMD_UE4 in UE4_CS
+            Where _camera is the camera reference frame, _native is the native reference frame (i.e., oculus API ref. frame)
+            and _CS means 'coordinate system', with HMD_CS being RH and UE4_CS being LH
+            */
+            EHMDDeviceType::Type HMDDtype = GEngine->HMDDevice->GetHMDDeviceType(); // EHMDDeviceType::DT_OculusRift
+
+            // Get the camera pose in HMD_UE4 in UE4_CS. This transforms from HMD_camera to HMD_native
             FVector CamOrigin;
             FQuat CamOrientation;
             float CamHFOV;
@@ -50,46 +65,81 @@ void UPSMoveComponent::TickComponent( float DeltaTime, ELevelTick TickType, FAct
             float CamNearPlane;
             float CamFarPlane;
             GEngine->HMDDevice->GetPositionalTrackingCameraProperties(CamOrigin, CamOrientation, CamHFOV, CamVFOV, CameraDistance, CamNearPlane, CamFarPlane);
-            CamOrigin = BaseOrientation.RotateVector(CamOrigin);
-            // TODO: CamOrigin /= CameraScale3D
-            CamOrigin += BaseOffset;
-            CamOrigin = FVector(CamOrigin.Y, CamOrigin.Z, -CamOrigin.X);
-            CamOrientation = BaseOrientation * CamOrientation;
-            CamOrientation.Normalize();
-            camMat = FQuatRotationTranslationMatrix(CamOrientation, CamOrigin);
 
-            // Get the HMD pose
-            FQuat HeadOrient;
-            GEngine->HMDDevice->GetCurrentOrientationAndPosition(HeadOrient, HeadPosition);
-            DeltaControlOrientation = ViewRotation.Quaternion() * HeadOrient.Inverse();
+            FVector CameraScale3D(1.0); // TODO: Get this from the HMD, but as far as I can tell this
+                                        // only changes if GetCurrentHMDPose is called with scale parameter
+
+            // Get the HMD_UE4 origin in HMD_native, both in UE4_CS
+            FVector HMDOrigin = GEngine->HMDDevice->GetBaseOffset(); // Custom addition to the engine by me.
+            FQuat HMDZeroYaw = GEngine->HMDDevice->GetBaseOrientation();
+
+            // Transform camera pose from HMD_UE4 space in UE4_CS to HMD_native in UE4_CS
+            // Currently Oculus-specific.
+            // TODO: CamOrigin -= frame->Settings->PositionOffset;  // Source says this is deprecated.
+            CamOrientation = HMDZeroYaw * CamOrientation;
+            CamOrientation.Normalize();
+            CamOrigin = HMDZeroYaw.RotateVector(CamOrigin);
+            CamOrigin /= CameraScale3D;
+            CamOrigin += HMDOrigin;
+
+            // Transform camera pose from HMD_native in UE4_CS to HMD_native in HMD_CS
+            CamOrigin = FVector(CamOrigin.Y, CamOrigin.Z, -CamOrigin.X);  // Convert to native HMD coordinate system
+            // TODO: units m->cm unnecessary because physical_transform was kept in cm.
+            CamOrientation = FQuat(CamOrientation.Y, CamOrientation.Z, -CamOrientation.X, -CamOrientation.W);  // Convert to native HMD coordinate system
+
+            // Transform the PSMove pose through the camera from HMD_camera in HMD_CS to HMD_native in HMD_CS
+            PSMPos = CamOrientation.RotateVector(PSMPos);
+            PSMPos += CamOrigin;
+            PSMOri = CamOrientation * PSMOri;
+
+            // Transform PSMove pose from HMD_native in HMD_CS to HMD_native in UE4_CS
+            // Currently Oculus-specific.
+            PSMOri = FQuat(-PSMOri.Z, PSMOri.X, PSMOri.Y, -PSMOri.W);   // Convert coordinate systems.
+            // TODO: units m->cm unnecessary because physical_transform was kept in cm.
+            PSMPos = FVector(-PSMPos.Z, PSMPos.X, PSMPos.Y);            // Convert coordinate systems.
+
+            // Transform PSMove pose from HMD_native in UE4_CS to HMD_UE4 in UE4_CS
+            PSMPos -= HMDOrigin;
+            PSMPos *= CameraScale3D;
+            PSMPos = HMDZeroYaw.Inverse().RotateVector(PSMPos);
+            PSMOri = HMDZeroYaw.Inverse() * PSMOri;
+            PSMOri.Normalize();
+            // TODO: PSMPos += frame->Settings->PositionOffset // Source says this is deprecated.
+        }
+        else
+        {
+            /*
+            If we are not using an HMD then assume that the PSMove coordinates being returned are in their native space.
+            */
+            // Transform from PSEye coordinate system to UE4 coordinate system
+            PSMOri = FQuat(-PSMOri.Z, PSMOri.X, PSMOri.Y, -PSMOri.W);
+            PSMPos = FVector(-PSMPos.Z, PSMPos.X, PSMPos.Y);
         }
 
-        // Get the raw PSMove position and quaternion
-        FVector PSMPos = DataFrame.GetPosition();
-        FQuat PSMOri = DataFrame.GetOrientation();
+        /*
+        Now we must transform from HMD_UE4 space to world_UE4 space.
+        This is done by transforming through the player camera which contains the player pose in the world.
+        */
+        FQuat DeltaControlOrientation = ViewRotation.Quaternion();
+        if (UseHMDCorrection && GEngine->HMDDevice.IsValid() && GEngine->IsStereoscopic3D())
+        {
+            // If using an HMD, it is necessary to undo the transformation done to the camera by the HMD.
+            // See here: https://github.com/EpicGames/UnrealEngine/blob/master/Engine/Plugins/Runtime/GearVR/Source/GearVR/Private/HeadMountedDisplayCommon.cpp#L989
+            
+            // Get the HMD pose
+            FVector HeadPosition;
+            FQuat HeadOrient;
+            GEngine->HMDDevice->GetCurrentOrientationAndPosition(HeadOrient, HeadPosition);
 
-        // Transform it through the Oculus camera
-        PSMPos = camMat.TransformPosition(PSMPos);
-
-        // Convert to UE4 coordinate system.
-        PSMPos = FVector(-PSMPos.Z, PSMPos.X, PSMPos.Y);
-        PSMPos -= BaseOffset;
-        // TODO: PSMPos *= CameraScale3D
-        PSMPos = BaseOrientation.Inverse().RotateVector(PSMPos);
-        PSMOri = BaseOrientation.Inverse() * PSMOri;
-        PSMOri.Normalize();
-
-        // Further transforms
-        // See here: https://github.com/EpicGames/UnrealEngine/blob/master/Engine/Plugins/Runtime/GearVR/Source/GearVR/Private/HeadMountedDisplayCommon.cpp#L989
+            // Untransform the camera through the HMD
+            DeltaControlOrientation = DeltaControlOrientation * HeadOrient.Inverse();
+            //PSMPos -= HeadPosition;  // Not useful unless we know the head has moved since the camera was last updated with the head pose
+        }
+        
+        // Transform the PSMove through the camera
         PSMOri = DeltaControlOrientation * PSMOri;
-        PSMPos = PSMPos - HeadPosition;
         PSMPos = DeltaControlOrientation.RotateVector(PSMPos);
-        FMatrix m(FMatrix::Identity);
-        m = PSMOri * m;
-        //TODO: m *= FScaleMatrix(frame->CameraScale3D);
-        m *= FTranslationMatrix(PSMPos);
-        m *= FTranslationMatrix(ViewLocation); // to location of pawn
-        PSMPos = m.TransformPosition(FVector(0.0));
+        PSMPos += ViewLocation;
 
         // Fire off the events
         OnDataUpdated.Broadcast(PSMPos, PSMOri.Rotator());

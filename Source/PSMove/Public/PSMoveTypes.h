@@ -115,7 +115,8 @@ struct FPSMoveDataFrame
     {
         if (RawDataPtr && RawDataPtr->IsConnected)
         {
-            return FQuat(-RawDataPtr->OriX, RawDataPtr->OriY, RawDataPtr->OriZ, -RawDataPtr->OriW);
+            //return FQuat(-RawDataPtr->OriX, RawDataPtr->OriY, RawDataPtr->OriZ, -RawDataPtr->OriW);
+            return FQuat(RawDataPtr->OriX, RawDataPtr->OriY, RawDataPtr->OriZ, RawDataPtr->OriW);
 
         }
         else {
@@ -125,13 +126,7 @@ struct FPSMoveDataFrame
     
     FRotator GetRotation()
     {
-        if (RawDataPtr && RawDataPtr->IsConnected)
-        {
-            return FQuat(-RawDataPtr->OriX, RawDataPtr->OriY, RawDataPtr->OriZ, -RawDataPtr->OriW).Rotator();
-
-        } else {
-            return FRotator(0.0);
-        }
+        GetOrientation().Rotator();
     }
     
     bool GetButtonTriangle()
