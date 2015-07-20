@@ -24,7 +24,7 @@ FPSMoveWorker::FPSMoveWorker(TArray<FPSMoveRawDataFrame>* &PSMoveRawDataArrayPtr
     bool updated = UpdateMoveCount();
     
     // This Inits and Runs the thread.
-    Thread = FRunnableThread::Create(this, TEXT("FPSMoveWorker"), 0, TPri_AboveNormal);
+    Thread = FRunnableThread::Create(this, TEXT("FPSMoveWorker"), 0, TPri_Normal);
 }
 
 bool FPSMoveWorker::UpdateMoveCount()
@@ -75,8 +75,10 @@ uint32 FPSMoveWorker::Run()
     {
         UE_LOG(LogPSMove, Log, TEXT("PSMove tracker initialized."));
         
-        //Set exposure. TODO: Make this configurable.
+        //Set exposure. TODO: Expose this to component.
         psmove_tracker_set_exposure(psmove_tracker, Exposure_MEDIUM);  //Exposure_LOW, Exposure_MEDIUM, Exposure_HIGH
+
+        psmove_tracker_set_smoothing(psmove_tracker, 0, 1);
         
         psmove_tracker_get_size(psmove_tracker, &tracker_width, &tracker_height);
         UE_LOG(LogPSMove, Log, TEXT("Camera Dimensions: %d x %d"), tracker_width, tracker_height);
@@ -99,15 +101,8 @@ uint32 FPSMoveWorker::Run()
         if (psmove_tracker)
         {
             psmove_tracker_set_mirror(psmove_tracker, PSMove_True);
-
-            while (psmove_tracker_enable(psmove_tracker, psmoves[i]) != Tracker_CALIBRATED); // Keep attempting to enable.
-            
-            //TODO: psmove_tracker_enable_with_color(psmove_tracker, psmoves[i], r, g, b)
-            //TODO: psmove_tracker_get_color(psmove_tracker, psmoves[i], unisgned char &r, &g, &b);
-            
-            PSMove_Bool auto_update_leds = psmove_tracker_get_auto_update_leds(psmove_tracker, psmoves[i]);
-            
-            WorkerDataFrames[i].IsTracked = true;
+            while (psmove_tracker_enable(psmove_tracker, psmoves[i]) != Tracker_CALIBRATED);
+            psmove_tracker_set_auto_update_leds(psmove_tracker, psmoves[i], PSMove_True);
         }
     }
 
@@ -125,30 +120,50 @@ uint32 FPSMoveWorker::Run()
         // Get positional data from tracker
         if (psmove_tracker)
         {
-
+            
             // Renew the image on camera
             psmove_tracker_update_image(psmove_tracker); // Sometimes libusb crashes here.
-            psmove_tracker_update(psmove_tracker, NULL); // Passing null (instead of m_moves[i]) updates all controllers.
+            psmove_tracker_update_cbb(psmove_tracker, NULL); // Passing null (instead of m_moves[i]) updates all controllers.
 
             for (int i = 0; i < PSMoveCount; i++)
             {
-                //psmove_tracker_get_location(psmove_tracker, psmoves[i], &xcm, &ycm, &zcm);
-                //UE_LOG(LogPSMove, Log, TEXT("Raw: %f, %f, %f"), xcm, ycm, zcm);
+                WorkerDataFrames[i].IsTracked = psmove_tracker_get_status(psmove_tracker, psmoves[i]) == Tracker_TRACKING;
 
                 psmove_fusion_get_transformed_position(psmove_fusion, psmoves[i], &xcm, &ycm, &zcm);
-                //UE_LOG(LogPSMove, Log, TEXT("Transformed: %f, %f, %f"), xcm, ycm, zcm);
 
-                if (xcm && ycm && zcm && !isnan(xcm) && !isnan(ycm) && !isnan(zcm) && xcm==xcm && ycm==ycm && zcm==zcm)
+                if (WorkerDataFrames[i].IsTracked &&
+                    xcm && ycm && zcm &&
+                    !isnan(xcm) && !isnan(ycm) && !isnan(zcm) &&
+                    xcm == xcm && ycm == ycm && zcm == zcm)
                 {
                     WorkerDataFrames[i].PosX = xcm;
                     WorkerDataFrames[i].PosY = ycm;
                     WorkerDataFrames[i].PosZ = zcm;
                 }
+                else {
+                    WorkerDataFrames[i].IsTracked = false;
+                }
 
                 //UE_LOG(LogPSMove, Log, TEXT("X: %f, Y: %f, Z: %f"), xcm, ycm, zcm);
-                if (WorkerDataFrames[i].ResetPoseRequest)
+                if (WorkerDataFrames[i].ResetPoseRequest && WorkerDataFrames[i].IsTracked)
                 {
                     psmove_tracker_reset_location(psmove_tracker, psmoves[i]);
+                }
+
+                // If we are to change the tracked colour.
+                if (WorkerDataFrames[i].UpdateLedRequest)
+                {
+                    psmove_tracker_disable(psmove_tracker, psmoves[i]);
+                    psmove_tracker_set_dimming(psmove_tracker, 0.0);  // Set dimming to 0 to trigger blinking calibration.
+                    psmove_set_leds(psmoves[i], 0, 0, 0);  // Turn off the LED to make sure it isn't trackable until new colour set.
+                    psmove_update_leds(psmoves[i]);
+                    FColor newFColor = WorkerDataFrames[i].LedColourRequest.Quantize();
+                    psmove_tracker_enable_with_color(psmove_tracker, psmoves[i], newFColor.R, newFColor.G, newFColor.B);
+                    WorkerDataFrames[i].LedColourWasUpdated = true;
+                }
+                else
+                {
+                    WorkerDataFrames[i].LedColourWasUpdated = false;
                 }
             }
         } else {
@@ -183,10 +198,14 @@ uint32 FPSMoveWorker::Run()
                 // Set the controller rumble (uint8; 0-255)
                 psmove_set_rumble(psmoves[i], WorkerDataFrames[i].RumbleRequest);
             }
+
             if (WorkerDataFrames[i].ResetPoseRequest)
             {
                 psmove_reset_orientation(psmoves[i]);
-                WorkerDataFrames[i].ResetPoseRequest = false;  // Might not be thread safe?
+                WorkerDataFrames[i].PoseWasReset = true;
+            }
+            else {
+                WorkerDataFrames[i].PoseWasReset = false;
             }
         }
 

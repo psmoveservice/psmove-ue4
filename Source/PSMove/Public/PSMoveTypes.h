@@ -6,7 +6,7 @@
 // Delegate types
 //---------------------------------------------------
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FPSMoveDataUpdatedDelegate, FVector, Position, FRotator, Rotation);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FPSMoveDataUpdatedDelegate, FVector, Position, FRotator, Rotation, bool, IsTracked);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPSMoveTriangleButtonDelegate, bool, IsDown);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPSMoveCircleButtonDelegate, bool, IsDown);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPSMoveCrossButtonDelegate, bool, IsDown);
@@ -60,7 +60,15 @@ struct FPSMoveRawDataFrame
     uint8 RumbleRequest;
 
     UPROPERTY()
+    FLinearColor LedColourRequest;
+
+    bool LedColourWasUpdated;
+    bool UpdateLedRequest;
+
+    UPROPERTY()
     bool ResetPoseRequest;
+
+    bool PoseWasReset;
 
     UPROPERTY()
     bool IsConnected;
@@ -85,7 +93,11 @@ struct FPSMoveRawDataFrame
         Released = 0;
         TriggerValue = 0;
         RumbleRequest = 0;
+        LedColourRequest = FColor();
+        LedColourWasUpdated = false;
+        UpdateLedRequest = false;
         ResetPoseRequest = false;
+        PoseWasReset = false;
         IsConnected = false;
         IsTracked = false;
     }
@@ -103,7 +115,7 @@ struct FPSMoveDataFrame
     
     FVector GetPosition()
     {
-        if (RawDataPtr && RawDataPtr->IsTracked)
+        if (RawDataPtr && RawDataPtr->IsConnected)
         {
             return FVector(RawDataPtr->PosX, RawDataPtr->PosY, RawDataPtr->PosZ);
         } else {
@@ -127,6 +139,17 @@ struct FPSMoveDataFrame
     FRotator GetRotation()
     {
         GetOrientation().Rotator();
+    }
+
+    bool GetIsTracked()
+    {
+        if (RawDataPtr && RawDataPtr->IsConnected)
+        {
+            return RawDataPtr->IsTracked;
+        }
+        else {
+            return false;
+        }
     }
     
     bool GetButtonTriangle()
@@ -227,11 +250,26 @@ struct FPSMoveDataFrame
         }
     }
 
+    void SetLedColourRequest(FLinearColor RequestedColourValue)
+    {
+        if (RawDataPtr && RawDataPtr->IsConnected && !RawDataPtr->LedColourWasUpdated && !(RawDataPtr->LedColourRequest == RequestedColourValue))
+        {
+            RawDataPtr->LedColourRequest = RequestedColourValue;
+            RawDataPtr->UpdateLedRequest = true;
+        }
+        else {
+            RawDataPtr->UpdateLedRequest = false;
+        }
+    }
+
     void SetResetPoseRequest(bool AskForPoseReset)
     {
-        if (RawDataPtr && RawDataPtr->IsConnected && !(RawDataPtr->ResetPoseRequest == AskForPoseReset))
+        if (RawDataPtr && RawDataPtr->IsConnected && !(RawDataPtr->ResetPoseRequest == AskForPoseReset) && !RawDataPtr->PoseWasReset)
         {
             RawDataPtr->ResetPoseRequest = AskForPoseReset;
+        }
+        else {
+            RawDataPtr->ResetPoseRequest = false;
         }
     }
 

@@ -56,16 +56,16 @@ typedef struct _PSMoveFusion PSMoveFusion; /*!< Handle to a PS Move Fusion objec
 #endif
 
 /**
- * \brief Combines provided transform with physical_xf for total_xf
- *
- * Creates and returns a new \ref PSMoveFusion object.
- *
- * \param fusion     A valid \ref PSMoveFusion handle
- * \param pos_xyz    A pointer to a float[3] array representing the
- *                   additional transform translation
- * \param quat_wxyz  A pointer to a float[4] array representing the
- *                   additional transform quaternion
- **/
+* \brief Combines provided transform with physical_xf for total_xf
+*
+* Creates and returns a new \ref PSMoveFusion object.
+*
+* \param fusion     A valid \ref PSMoveFusion handle
+* \param pos_xyz    A pointer to a float[3] array representing the
+*                   additional transform translation
+* \param quat_wxyz  A pointer to a float[4] array representing the
+*                   additional transform quaternion
+**/
 ADDAPI void
 ADDCALL psmove_fusion_update_transform(PSMoveFusion *fusion, float *pos_xyz, float *quat_wxyz);
 
@@ -150,22 +150,22 @@ ADDCALL psmove_fusion_get_transform_matrix(PSMoveFusion *fusion);
 ADDAPI void
 ADDCALL psmove_fusion_get_position(PSMoveFusion *fusion, PSMove *move,
         float *x, float *y, float *z);
-        
+
 /**
- * \brief Get the 3D position of a controller after applying transforms
- *
- * This function returns the 3D position of the motion controller
- * in a new coordinate space.
- *
- * \param fusion A valid \ref PSMoveFusion handle
- * \param move A valid \ref PSMove handle
- * \param x A pointer to store the X part of the position vector
- * \param y A pointer to store the Y part of the position vector
- * \param z A pointer to store the Z part of the position vector
- **/
+* \brief Get the 3D position of a controller after applying transforms
+*
+* This function returns the 3D position of the motion controller
+* in a new coordinate space.
+*
+* \param fusion A valid \ref PSMoveFusion handle
+* \param move A valid \ref PSMove handle
+* \param x A pointer to store the X part of the position vector
+* \param y A pointer to store the Y part of the position vector
+* \param z A pointer to store the Z part of the position vector
+**/
 ADDAPI void
 ADDCALL psmove_fusion_get_transformed_position(PSMoveFusion *fusion, PSMove *move,
-        float *x, float *y, float *z);
+float *x, float *y, float *z);
 
 /**
  * \brief Destroy an existing fusion instance and free allocated resources

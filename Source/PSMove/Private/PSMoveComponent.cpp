@@ -4,7 +4,7 @@
 #include "Runtime/HeadMountedDisplay/Public/HeadMountedDisplay.h"
 
 UPSMoveComponent::UPSMoveComponent(const FObjectInitializer &init)
-    : PSMoveID(0), UseHMDCorrection(true), ViewRotation(FRotator::ZeroRotator), ViewLocation(0.0)
+    : PSMoveID(0), UseHMDCorrection(true), ViewRotation(FRotator::ZeroRotator), ViewLocation(0.0), ZeroYaw(FQuat::Identity)
 {
     bWantsInitializeComponent = true;
     PrimaryComponentTick.bCanEverTick = true;
@@ -34,6 +34,7 @@ void UPSMoveComponent::TickComponent( float DeltaTime, ELevelTick TickType, FAct
         // Get the raw PSMove position and quaternion
         FVector PSMPos = DataFrame.GetPosition();
         FQuat PSMOri = DataFrame.GetOrientation();
+        bool PSMIsTracked = DataFrame.GetIsTracked();
 
         /*
         There are several steps needed to go from the PSMove reference frame to the game world reference frame.
@@ -142,8 +143,13 @@ void UPSMoveComponent::TickComponent( float DeltaTime, ELevelTick TickType, FAct
         PSMPos = DeltaControlOrientation.RotateVector(PSMPos);
         PSMPos += ViewLocation;
 
+        LastPosition = PSMPos;
+        LastOrientation = PSMOri;
+
+        PSMOri = ZeroYaw * PSMOri;
+
         // Fire off the events
-        OnDataUpdated.Broadcast(PSMPos, PSMOri.Rotator());
+        OnDataUpdated.Broadcast(PSMPos, PSMOri.Rotator(), PSMIsTracked);
         OnTriangleButton.Broadcast(DataFrame.GetButtonTriangle());
         OnCircleButton.Broadcast(DataFrame.GetButtonCircle());
         OnCrossButton.Broadcast(DataFrame.GetButtonCross());
@@ -155,6 +161,16 @@ void UPSMoveComponent::TickComponent( float DeltaTime, ELevelTick TickType, FAct
         OnTriggerButton.Broadcast(DataFrame.GetTriggerValue());
         
         DataFrame.SetRumbleRequest(RumbleRequest);
+        DataFrame.SetLedColourRequest(LedRequest);
         DataFrame.SetResetPoseRequest(ResetPoseRequest);
     }
+}
+
+void UPSMoveComponent::ResetYaw()
+{
+    ZeroYaw = LastOrientation;
+    ZeroYaw.X = 0;
+    ZeroYaw.Y = 0;
+    ZeroYaw.Normalize();
+    ZeroYaw = ZeroYaw.Inverse();
 }

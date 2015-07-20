@@ -29,7 +29,13 @@ public:
     uint8 RumbleRequest;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = PSMove)
+    FLinearColor LedRequest;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = PSMove)
     bool ResetPoseRequest;
+
+    UFUNCTION(BlueprintCallable, Category = PSMove)
+    void ResetYaw();
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = PSMove)
     bool UseHMDCorrection;
@@ -73,5 +79,10 @@ public:
     FPSMoveTriggerButtonDelegate OnTriggerButton;
     
 protected:
+
+private:
+    FQuat ZeroYaw;
+    FVector LastPosition;
+    FQuat LastOrientation;
     
 };

@@ -204,6 +204,18 @@ ADDAPI enum PSMoveTracker_Exposure
 ADDCALL psmove_tracker_get_exposure(PSMoveTracker *tracker);
 
 /**
+* \brief Set whether or not the tracker should do smoothing.
+*
+* This function enables (1) or disables (0) smoothing for xy and z dimensions.
+*
+* \param tracker A valid \ref PSMoveTracker handle
+* \param adaptive_xy int 0 or 1
+* \param adaptive_z int 0 or 1
+**/
+ADDAPI void
+ADDCALL psmove_tracker_set_smoothing(PSMoveTracker *tracker, int adaptive_xy, int adaptive_z);
+
+/**
  * \brief Enable or disable camera image deinterlacing (line doubling)
  *
  * Enables or disables camera image deinterlacing for this tracker.
@@ -417,6 +429,24 @@ ADDAPI int
 ADDCALL psmove_tracker_update(PSMoveTracker *tracker, PSMove *move);
 
 /**
+ * \brief Process incoming data and update tracking information
+ *
+ * This function tracks one or all motion controllers in the camera
+ * image, and updates tracking information such as 3D position
+ * and camera color.
+ *
+ * This function must be called after psmove_tracker_update_image().
+ *
+ * \param tracker A valid \ref PSMoveTracker handle
+ * \param move A valid \ref PSMove handle (to update a single controller)
+ *             or \c NULL to update all enabled controllers at once
+ *
+ * \return Nonzero if tracking was successful, zero otherwise
+ **/
+ADDAPI int
+ADDCALL psmove_tracker_update_cbb(PSMoveTracker *tracker, PSMove *move);
+
+/**
  * \brief Draw debugging information onto the current camera image
  *
  * This function has to be called after psmove_tracker_update(), and
@@ -471,10 +501,10 @@ ADDAPI PSMoveTrackerRGBImage
 ADDCALL psmove_tracker_get_image(PSMoveTracker *tracker);
 
 /**
- * \brief Get the current pixel position and radius of a tracked controller
+ * \brief Get the current position and radius of a tracked controller
  *
- * This function obtains the pixel position and radius of a controller in the
- * camera image. Radius is actually the length of the major ellipse axis.
+ * This function obtains the position and radius of a controller in the
+ * camera image.
  *
  * \param tracker A valid \ref PSMoveTracker handle
  * \param move A valid \ref PSMove handle
@@ -504,7 +534,8 @@ ADDCALL psmove_tracker_get_position(PSMoveTracker *tracker,
 **/
 ADDAPI int
 ADDCALL psmove_tracker_get_location(PSMoveTracker *tracker,
-        PSMove *move, float *xcm, float *ycm, float *zcm);
+PSMove *move, float *xcm, float *ycm, float *zcm);
+
 
 /**
 * \brief Rest the location offsets to the current location
@@ -532,6 +563,46 @@ ADDCALL psmove_tracker_reset_location(PSMoveTracker *tracker, PSMove *move);
 ADDAPI void
 ADDCALL psmove_tracker_get_size(PSMoveTracker *tracker,
         int *width, int *height);
+
+/**
+ * \brief Calculate the physical distance (in cm) of the controller
+ *
+ * Given the radius of the controller in the image (in pixels), this function
+ * calculates the physical distance of the controller from the camera (in cm).
+ *
+ * By default, this function's parameters are set up for the PS Eye camera in
+ * wide angle view. You can set different parameters using the function
+ * psmove_tracker_set_distance_parameters().
+ *
+ * \param tracker A valid \ref PSMoveTracker handle
+ * \param radius The radius for which the distance should be calculated, the
+ *               radius is returned by psmove_tracker_get_position()
+ **/
+ADDAPI float
+ADDCALL psmove_tracker_distance_from_radius(PSMoveTracker *tracker,
+        float radius);
+
+/**
+ * \brief Set the parameters for the distance mapping function
+ *
+ * This function sets the parameters for the Pearson VII distribution
+ * function that's used to map radius values to distance values in
+ * psmove_tracker_distance_from_radius(). By default, the parameters are
+ * set up so that they work well for a PS Eye camera in wide angle mode.
+ *
+ * The function is defined as in: http://fityk.nieto.pl/model.html
+ *
+ * distance = height / ((1+((radius-center)/hwhm)^2 * (2^(1/shape)-1)) ^ shape)
+ *
+ * \param tracker A valid \ref PSMoveTracker handle
+ * \param height The height parameter of the Pearson VII distribution
+ * \param center The center parameter of the Pearson VII distribution
+ * \param hwhm The hwhm parameter of the Pearson VII distribution
+ * \param shape The shape parameter of the Pearson VII distribution
+ **/
+ADDAPI void
+ADDCALL psmove_tracker_set_distance_parameters(PSMoveTracker *tracker,
+        float height, float center, float hwhm, float shape);
 
 /**
  * \brief Destroy an existing tracker instance and free allocated resources
