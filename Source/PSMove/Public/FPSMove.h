@@ -34,21 +34,16 @@ public:
     {
         return FModuleManager::Get().IsModuleLoaded( "PSMove" );
     }
-    
-    /**
-     * A pointer to an array of raw data frames, one for each connected controller.
-     */
-    TArray<FPSMoveRawDataFrame>* ModuleRawDataArrayPtr;
-    
+       
     /**
      * Here we declare functions that will be accessed via the module instance from within the game.
      */
     virtual void InitWorker();
     
-    /**
-     * A component passes in a (typically null) pointer to a raw data frame.
-     * This updates the pointer so it points to the same place as the module's raw data frame pointer for this ID
-     * i.e., it now points to the Worker's raw data frame.
-     */
-    virtual void  GetRawDataFramePtr(uint8 PSMoveID, FPSMoveRawDataFrame* &RawDataFramePtrOut);
+	/**
+	* Tell the PSMove module that we want to start listening to this controller.
+	*
+	* @return True if we can successfully acquire the controller.
+	*/
+	virtual bool AcquirePSMove(int32 PSMoveID, FPSMoveDataContext *DataContext);
 };

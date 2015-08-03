@@ -10,7 +10,6 @@ void FPSMove::StartupModule()
 {
     // This code will execute after your module is loaded into memory (but after global variables are initialized, of course.)
     UE_LOG(LogPSMove, Log, TEXT("Loading PSMove module..."));
-    ModuleRawDataArrayPtr = nullptr;
 }
 
 void FPSMove::ShutdownModule()
@@ -28,17 +27,21 @@ void FPSMove::InitWorker()
     // Init the PSMoveWorker singleton if needed.
     // This will also init the controllers and tracker if needed.
     UE_LOG(LogPSMove, Log, TEXT("Trying to initializing PSMoveWorker..."));
-    FPSMoveWorker::PSMoveWorkerInit(ModuleRawDataArrayPtr);
+    FPSMoveWorker::PSMoveWorkerInit();
 }
 
 
-void  FPSMove::GetRawDataFramePtr(uint8 PSMoveID, FPSMoveRawDataFrame* &RawDataFramePtrOut)
+bool FPSMove::AcquirePSMove(
+	int32 PSMoveID,
+	FPSMoveDataContext *DataContext)
 {
-    if (ModuleRawDataArrayPtr && ModuleRawDataArrayPtr->IsValidIndex(PSMoveID))
-    {
-        // De-reference the ptr to get the raw data frame array
-        // Then index it to get a specific raw data frame
-        // Then set the passed in pointer to its address.
-        RawDataFramePtrOut = &((*ModuleRawDataArrayPtr)[PSMoveID]);
-    }
+	bool success = false;
+	FPSMoveWorker* WorkerSingleton = FPSMoveWorker::GetSingletonInstance();
+
+	if (WorkerSingleton != NULL)
+	{
+		success = WorkerSingleton->AcquirePSMove(PSMoveID, DataContext);
+	}
+
+	return success;
 }

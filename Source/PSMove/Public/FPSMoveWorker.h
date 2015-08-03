@@ -11,37 +11,54 @@
 class FPSMoveWorker : public FRunnable
 {
 public:
-    FPSMoveWorker(TArray<FPSMoveRawDataFrame>* &PSMoveRawDataArrayPtr); // Usually called by singleton access via Init
-    virtual ~FPSMoveWorker();
+	static const int k_max_controllers = 5; // 5 tracking colors available: magenta, cyan, yellow, red, blue
 
-    /** Thread for polling the controller and tracker */
-    FRunnableThread* Thread;
+	/** Static access to get the worker singleton.*/
+	static FPSMoveWorker* GetSingletonInstance() { return WorkerInstance; }
+	/** Static access to start the thread.*/
+	static FPSMoveWorker* PSMoveWorkerInit();
+	/** Static access to stop the thread.*/
+	static void Shutdown();
 
-    /** Thread Safe Counter. ?? */
-    FThreadSafeCounter StopTaskCounter;
-    
-    /** An array of raw data strctures, one for each controller */
-    TArray<FPSMoveRawDataFrame> WorkerDataFrames;
+	/**
+	* Tell the PSMove Worker that we want to start listening to this controller.
+	*
+	* @return True if we can successfully acquire the controller.
+	*/
+	bool AcquirePSMove(int32 PSMoveID, FPSMoveDataContext *DataContext);
 
     /** Request the Worker check to see if the number of controllers has changed. */
     void RequestMoveCheck();
 
-    /** FRunnable Interface */
-    virtual bool Init(); // override?
-    virtual uint32 Run(); // override?
-    virtual void Stop(); // override?
+private:
+	FPSMoveWorker(); // Called by singleton access via Init
+	virtual ~FPSMoveWorker();
 
-    /** Singleton instance for static access. */
-    static FPSMoveWorker* WorkerInstance;
-    /** Static access to start the thread.*/
-    static FPSMoveWorker* PSMoveWorkerInit(TArray<FPSMoveRawDataFrame>* &PSMoveRawDataArrayPtr);
-    /** Static access to stop the thread.*/
-    static void Shutdown();
+	/** FRunnable Interface */
+	virtual bool Init(); // override?
+	virtual uint32 Run(); // override?
+	virtual void Stop(); // override?
 
 private:
-    /** We need a reference to the Module's RawDataArrayPtr because it will be passed in on initialization but not used until the Thread runs. */
-    TArray<FPSMoveRawDataFrame>** ModuleRawDataArrayPtrPtr;
+	/** Singleton instance for static access. */
+	static FPSMoveWorker* WorkerInstance;
+
+	/** Thread for polling the controller and tracker */
+	FRunnableThread* Thread;
+
+	/** Thread Safe Counter. */
+	FThreadSafeCounter StopTaskCounter;
+
+	/** An array of raw data structures, one for each controller */
+	FPSMoveRawControllerData_TLS WorkerControllerDataArray[k_max_controllers];
+
+	/** 
+	 * Published worker data that shouldn't touched directly.
+	 * Access through _TLS version of the structures. 
+	 */
+	FPSMoveRawControllerData_Concurrent WorkerControllerDataArray_Concurrent[k_max_controllers];
+
     uint8 PSMoveCount;
-    bool MoveCheckRequested;
-    bool UpdateMoveCount();
+	uint32 LastMoveCountCheckTime;
+	bool UpdateControllerConnections(PSMoveTracker *Tracker, PSMove **psmoves);
 };
