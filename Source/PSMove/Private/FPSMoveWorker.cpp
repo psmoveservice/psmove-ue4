@@ -87,6 +87,7 @@ bool FPSMoveWorker::UpdateControllerConnections(
 				if (PSMoves[psmove_id] != NULL && this->WorkerControllerDataArray[psmove_id].IsCalibrated == false)
 				{
 					PSMoveTracker_Status tracking_status = psmove_tracker_enable(Tracker, PSMoves[psmove_id]);
+					psmove_tracker_set_auto_update_leds(Tracker, PSMoves[psmove_id], PSMove_True);
 					
 					if (tracking_status == Tracker_CALIBRATED)
 					{
@@ -175,8 +176,8 @@ uint32 FPSMoveWorker::Run()
         
         //Set exposure. TODO: Expose this to component.
         psmove_tracker_set_exposure(psmove_tracker, Exposure_MEDIUM);  //Exposure_LOW, Exposure_MEDIUM, Exposure_HIGH
-
         psmove_tracker_set_smoothing(psmove_tracker, 0, 1);
+		psmove_tracker_set_mirror(psmove_tracker, PSMove_True);
         
         psmove_tracker_get_size(psmove_tracker, &tracker_width, &tracker_height);
         UE_LOG(LogPSMove, Log, TEXT("Camera Dimensions: %d x %d"), tracker_width, tracker_height);
