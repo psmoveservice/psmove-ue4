@@ -23,7 +23,7 @@ public:
     int32 PSMoveID;
  
     UPROPERTY()
-    FPSMoveDataFrame DataFrame;
+	FPSMoveDataContext DataContext;
     
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = PSMove)
     uint8 RumbleRequest;
