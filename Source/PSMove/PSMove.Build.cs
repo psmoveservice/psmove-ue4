@@ -76,7 +76,6 @@ namespace UnrealBuildTool.Rules
         {
             bool isLibrarySupported = false;
             string PlatformString = "Mac";
-            string OVPlatformString = "x64";
             if ((Target.Platform == UnrealTargetPlatform.Win64) || (Target.Platform == UnrealTargetPlatform.Win32))
             {
                 isLibrarySupported = true;
@@ -84,7 +83,7 @@ namespace UnrealBuildTool.Rules
                 PublicAdditionalLibraries.Add(Path.Combine(LibraryPath, PlatformString, "psmoveapi.lib"));
                 PublicAdditionalLibraries.Add(Path.Combine(LibraryPath, PlatformString, "psmoveapi_tracker.lib"));
                 // Temporarily adding LibOVR so I can get camera position (until UE4 is fixed).
-                OVPlatformString = (Target.Platform == UnrealTargetPlatform.Win64) ? "x64" : "Win32";
+                //string OVPlatformString = (Target.Platform == UnrealTargetPlatform.Win64) ? "x64" : "Win32";
                 //PublicAdditionalLibraries.Add(Path.Combine(ThirdPartyPath, "LibOVR", "Win_0.6.0.1", "Lib", "Windows", OVPlatformString, "Release", "VS2013", "LibOVR.lib"));
                 //FPlatformProcess::PushDllDirectory() ???
                 //FPlatformProcess::GetDllHandle() ???

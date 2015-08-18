@@ -265,7 +265,7 @@ struct FPSMoveDataContext
     
     FRotator GetRotation()
     {
-        GetOrientation().Rotator();
+        return GetOrientation().Rotator();
     }
 
     bool GetIsTracked()

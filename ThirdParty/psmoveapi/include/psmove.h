@@ -30,26 +30,24 @@
 #ifndef __PSMOVE_H
 #define __PSMOVE_H
 
+#include "psmove_platform_config.h"
+
+
+// Need this declared before include psmove_time.h
+/*! Boolean type. Use them instead of 0 and 1 to improve code readability. */
+enum PSMove_Bool {
+    PSMove_False = 0, /*!< False, Failure, Disabled (depending on context) */
+    PSMove_True = 1, /*!< True, Success, Enabled (depending on context) */
+};
+
+// Include the time functions with the main api
+#include "psmove_time.h"
+
+// Include file i/o functions with the main api
+#include "psmove_file.h"
+
 #ifdef __cplusplus
 extern "C" {
-#endif
-
-#include "psmove_config.h"
-
-#ifdef _WIN32
-#  define ADDCALL __cdecl
-#  if defined(BUILDING_STATIC_LIBRARY)
-#    define ADDAPI
-#  elif defined(USING_STATIC_LIBRARY)
-#    define ADDAPI
-#  elif defined(BUILDING_SHARED_LIBRARY)
-#    define ADDAPI __declspec(dllexport)
-#  else /* using shared library */
-#    define ADDAPI __declspec(dllimport)
-#  endif
-#else
-#  define ADDAPI
-#  define ADDCALL
 #endif
 
 /*! Connection type for controllers.
@@ -152,12 +150,6 @@ enum PSMove_Update_Result {
     Update_Ignored, /*!< LEDs don't need updating, see psmove_set_rate_limiting() */
 };
 
-/*! Boolean type. Use them instead of 0 and 1 to improve code readability. */
-enum PSMove_Bool {
-    PSMove_False = 0, /*!< False, Failure, Disabled (depending on context) */
-    PSMove_True = 1, /*!< True, Success, Enabled (depending on context) */
-};
-
 /*! Remote configuration options, for psmove_set_remote_config() */
 enum PSMove_RemoteConfig {
     PSMove_LocalAndRemote = 0, /*!< Use both local (hidapi) and remote (moved) devices */
@@ -169,6 +161,11 @@ enum PSMove_RemoteConfig {
 struct _PSMove;
 typedef struct _PSMove PSMove; /*!< Handle to a PS Move Controller.
                                     Obtained via psmove_connect_by_id() */
+struct _PSMoveOrientation;
+typedef struct _PSMoveOrientation PSMoveOrientation;
+
+struct _PSMove_3AxisVector;
+typedef struct _PSMove_3AxisVector PSMove_3AxisVector;
 #endif
 
 /*! Size of buffer for holding the extension device's data as reported by the Move */
@@ -217,6 +214,17 @@ enum PSMove_Version {
  **/
 ADDAPI enum PSMove_Bool
 ADDCALL psmove_init(enum PSMove_Version version);
+    
+    
+/**
+ * \brief Shutdown the library.
+ *
+ * This library call should be used at the end of each application using
+ * the PS Move API to shut down its dependent libraries.
+ *
+ **/
+ADDAPI void
+ADDCALL psmove_shutdown();
 
 /**
  * \brief Enable or disable the usage of local or remote devices
@@ -891,6 +899,29 @@ ADDCALL psmove_get_gyroscope_frame(PSMove *move, enum PSMove_Frame frame,
         float *gx, float *gy, float *gz);
 
 /**
+ * \brief Get the raw magnetometer reading from the PS Move.
+ *
+ * This function reads the raw sensor values from the controller,
+ * pointing to magnetic north.
+ *
+ * The result value range is -2048..+2047. The magnetometer is located
+ * roughly below the glowing orb - you can glitch the values with a
+ * strong kitchen magnet by moving it around the bottom ring of the orb.
+ * You can detect if a magnet is nearby by checking if any two values
+ * stay at zero for several frames.
+ *
+ * You need to call psmove_poll() first to read new data from the
+ * controller.
+ *
+ * \param move A valid \ref PSMove handle
+ * \param mx Pointer to store the raw X axis reading, or \c NULL
+ * \param my Pointer to store the raw Y axis reading, or \c NULL
+ * \param mz Pointer to store the raw Z axis reading, or \c NULL
+ **/
+ADDAPI void
+ADDCALL psmove_get_magnetometer(PSMove *move, int *mx, int *my, int *mz);
+
+/**
  * \brief Get the normalized magnetometer vector from the controller.
  *
  * The normalized magnetometer vector is a three-axis vector where each
@@ -908,8 +939,25 @@ ADDCALL psmove_get_gyroscope_frame(PSMove *move, enum PSMove_Frame frame,
  * \param mz Pointer to store the Z axis reading, or \c NULL
  **/
 ADDAPI void
-ADDCALL psmove_get_magnetometer_vector(PSMove *move,
-        float *mx, float *my, float *mz);
+ADDCALL psmove_get_magnetometer_vector(PSMove *move, float *mx, float *my, float *mz);
+
+/**
+ * \brief Get the normalized magnetometer vector from the controller.
+ *
+ * The normalized magnetometer vector is a three-axis vector where each
+ * component is in the range [-1,+1], including both endpoints. The range
+ * will be dynamically determined based on the highest (and lowest) value
+ * observed during runtime. To get the raw magnetometer readings, use
+ * psmove_get_magnetometer().
+ *
+ * You need to call psmove_poll() first to read new data from the
+ * controller.
+ *
+ * \param move A valid \ref PSMove handle
+ * \param m Pointer to \ref PSMove_3AxisVector 
+ **/
+ADDAPI void
+ADDCALL psmove_get_magnetometer_3axisvector(PSMove *move, PSMove_3AxisVector *out_m);
 
 /**
  * \brief Check if calibration is available on this controller.
@@ -1011,6 +1059,18 @@ ADDCALL psmove_get_orientation(PSMove *move,
         float *w, float *x, float *y, float *z);
 
 /**
+ * \brief Get a handle to the orientation state.
+ *
+ * Used to directly access the orientation state to set advanced orientation features.
+ *
+ * \param move A valid \ref PSMove handle
+ *
+ * \return \ref PSMoveOrientation if orientation is enabled, NULL otherwise
+ **/
+ADDAPI PSMoveOrientation *
+ADDCALL psmove_get_orientation_state(PSMove *move);
+
+/**
  * \brief Reset the current orientation quaternion.
  *
  * This will set the current 3D rotation of the PS Move controller as
@@ -1027,6 +1087,17 @@ ADDCALL psmove_get_orientation(PSMove *move,
 ADDAPI void
 ADDCALL psmove_reset_orientation(PSMove *move);
 
+/**
+* \brief Get the earth magnetometer direction.
+*
+* This returns the direction of the gravitational field in the identity pose during calibration.
+*
+* \param move A valid \ref PSMove handle
+*
+* \return The expected direction of gravity
+**/
+ADDAPI void
+ADDCALL psmove_get_gravity_calibration_direction(PSMove *move, PSMove_3AxisVector *out_a);
 
 /**
  * \brief Reset the magnetometer calibration state.
@@ -1062,8 +1133,32 @@ ADDCALL psmove_save_magnetometer_calibration(PSMove *move);
  *
  * \return The smallest raw sensor range difference of all three axes
  **/
-ADDAPI int
+ADDAPI float
 ADDCALL psmove_get_magnetometer_calibration_range(PSMove *move);
+
+/**
+* \brief Get the calibration magnetometer direction.
+*
+* This returns the direction of the magnetic field in the identity pose.
+*
+* \param move A valid \ref PSMove handle
+*
+* \return The direction of the magnetic field
+**/
+ADDAPI void
+ADDCALL psmove_get_magnetometer_calibration_direction(PSMove *move, PSMove_3AxisVector *out_m);
+
+/**
+* \brief Set the calibration magnetometer direction.
+*
+* This sets the direction of the magnetic field in the identity pose.
+* This is typically only set during calibration.
+*
+* \param move A valid \ref PSMove handle
+* \param m A valid \ref PSMoveVector
+**/
+ADDAPI void
+ADDCALL psmove_set_magnetometer_calibration_direction(PSMove *move, PSMove_3AxisVector *m);
 
 /**
  * \brief Disconnect from the PS Move and release resources.
@@ -1097,95 +1192,6 @@ ADDCALL psmove_disconnect(PSMove *move);
  **/
 ADDAPI void
 ADDCALL psmove_reinit();
-
-/**
- * \brief Get milliseconds since first library use.
- *
- * This function is used throughout the library to take care of timing and
- * measurement. It implements a cross-platform way of getting the current
- * time, relative to library use.
- *
- * \return Time (in ms) since first library use.
- **/
-ADDAPI long
-ADDCALL psmove_util_get_ticks();
-
-/**
- * \brief Get local save directory for settings.
- *
- * The local save directory is a PS Move API-specific directory where the
- * library and its components will store files such as calibration data,
- * tracker state and configuration files.
- *
- * \return The local save directory for settings.
- *         The returned value is reserved in static memory - it must not be freed!
- **/
-ADDAPI const char *
-ADDCALL psmove_util_get_data_dir();
-
-/**
- * \brief Get a filename path in the local save directory.
- *
- * This is a convenience function wrapping psmove_util_get_data_dir()
- * and will give the absolute path of the given filename.
- *
- * The data directory will be created in case it doesn't exist yet.
- *
- * \param filename The basename of the file (e.g. \c myfile.txt)
- *
- * \return The absolute filename to the file. The caller must
- *         free() the result when it is not needed anymore.
- * \return On error, \c NULL is returned.
- **/
-ADDAPI char *
-ADDCALL psmove_util_get_file_path(const char *filename);
-
-/**
- * \brief Get a filename path in the system save directory.
- *
- * This is a convenience function, which gives the absolute path for
- * a file stored in system-wide data directory.
- *
- * The data directory will NOT be created in case it doesn't exist yet.
- *
- * \param filename The basename of the file (e.g. \c myfile.txt)
- *
- * \return The absolute filename to the file. The caller must
- *         free() the result when it is not needed anymore.
- * \return On error, \c NULL is returned.
- **/
-ADDAPI char *
-ADDCALL psmove_util_get_system_file_path(const char *filename);
-
-/**
- * \brief Get an integer from an environment variable
- *
- * Utility function used to get configuration from environment
- * variables.
- *
- * \param name The name of the environment variable
- *
- * \return The integer value of the environment variable, or -1 if
- *         the variable is not set or could not be parsed as integer.
- **/
-ADDAPI int
-ADDCALL psmove_util_get_env_int(const char *name);
-
-/**
- * \brief Get a string from an environment variable
- *
- * Utility function used to get configuration from environment
- * variables.
- *
- * \param name The name of the environment variable
- *
- * \return The string value of the environment variable, or NULL if the
- *         variable is not set. The caller must free() the result when
- *         it is not needed anymore.
- **/
-ADDAPI char *
-ADDCALL psmove_util_get_env_string(const char *name);
-
 
 #ifdef __cplusplus
 }

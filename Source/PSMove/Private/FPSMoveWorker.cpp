@@ -220,104 +220,101 @@ uint32 FPSMoveWorker::Run()
 
 			// Get positional data from tracker
 			if (psmove_tracker)
-			{
-				for (int i = 0; i < PSMoveCount; i++)
-				{
-					localControllerData.IsTracked = psmove_tracker_get_status(psmove_tracker, psmoves[i]) == Tracker_TRACKING;
+            {
+                localControllerData.IsTracked = psmove_tracker_get_status(psmove_tracker, psmoves[i]) == Tracker_TRACKING;
 
-					psmove_fusion_get_transformed_position(psmove_fusion, psmoves[i], &xcm, &ycm, &zcm);
+                psmove_fusion_get_transformed_location(psmove_fusion, psmoves[i], &xcm, &ycm, &zcm);
 
-					if (localControllerData.IsTracked &&
-						xcm && ycm && zcm &&
-						!isnan(xcm) && !isnan(ycm) && !isnan(zcm) &&
-						xcm == xcm && ycm == ycm && zcm == zcm)
-					{
-						localControllerData.PosX = xcm;
-						localControllerData.PosY = ycm;
-						localControllerData.PosZ = zcm;
-					}
-					else {
-						localControllerData.IsTracked = false;
-					}
+                if (localControllerData.IsTracked &&
+                    xcm && ycm && zcm &&
+                    !isnan(xcm) && !isnan(ycm) && !isnan(zcm) &&
+                    xcm == xcm && ycm == ycm && zcm == zcm)
+                {
+                    localControllerData.PosX = xcm;
+                    localControllerData.PosY = ycm;
+                    localControllerData.PosZ = zcm;
+                }
+                else {
+                    localControllerData.IsTracked = false;
+                }
 
-					//UE_LOG(LogPSMove, Log, TEXT("X: %f, Y: %f, Z: %f"), xcm, ycm, zcm);
-					if (localControllerData.ResetPoseRequest && localControllerData.IsTracked)
-					{
-						psmove_tracker_reset_location(psmove_tracker, psmoves[i]);
-					}
+                //UE_LOG(LogPSMove, Log, TEXT("X: %f, Y: %f, Z: %f"), xcm, ycm, zcm);
+                if (localControllerData.ResetPoseRequest && localControllerData.IsTracked)
+                {
+                    psmove_tracker_reset_location(psmove_tracker, psmoves[i]);
+                }
 
-					// If we are to change the tracked colour.
-					if (localControllerData.UpdateLedRequest)
-					{
-						// Stop tracking the controller with the existing color
-						psmove_tracker_disable(psmove_tracker, psmoves[i]);
-						localControllerData.IsTracked = false;
-						localControllerData.IsCalibrated = false;
+                // If we are to change the tracked colour.
+                if (localControllerData.UpdateLedRequest)
+                {
+                    // Stop tracking the controller with the existing color
+                    psmove_tracker_disable(psmove_tracker, psmoves[i]);
+                    localControllerData.IsTracked = false;
+                    localControllerData.IsCalibrated = false;
 
-						psmove_tracker_set_dimming(psmove_tracker, 0.0);  // Set dimming to 0 to trigger blinking calibration.
-						psmove_set_leds(psmoves[i], 0, 0, 0);  // Turn off the LED to make sure it isn't trackable until new colour set.
-						psmove_update_leds(psmoves[i]);
-						FColor newFColor = localControllerData.LedColourRequest.Quantize();
+                    psmove_tracker_set_dimming(psmove_tracker, 0.0);  // Set dimming to 0 to trigger blinking calibration.
+                    psmove_set_leds(psmoves[i], 0, 0, 0);  // Turn off the LED to make sure it isn't trackable until new colour set.
+                    psmove_update_leds(psmoves[i]);
+                    FColor newFColor = localControllerData.LedColourRequest.Quantize();
 
-						if (psmove_tracker_enable_with_color(psmove_tracker, psmoves[i], newFColor.R, newFColor.G, newFColor.B) == Tracker_CALIBRATED)
-						{
-							this->WorkerControllerDataArray[i].IsCalibrated = true;
-						}
-						else
-						{
-							UE_LOG(LogPSMove, Error, TEXT("Failed to change tracking color for PSMove controller %d"), i);
-						}
+                    if (psmove_tracker_enable_with_color(psmove_tracker, psmoves[i], newFColor.R, newFColor.G, newFColor.B) == Tracker_CALIBRATED)
+                    {
+                        this->WorkerControllerDataArray[i].IsCalibrated = true;
+                    }
+                    else
+                    {
+                        UE_LOG(LogPSMove, Error, TEXT("Failed to change tracking color for PSMove controller %d"), i);
+                    }
 
-						localControllerData.LedColourWasUpdated = true;
-					}
-					else
-					{
-						localControllerData.LedColourWasUpdated = false;
-					}
-				}
+                    localControllerData.LedColourWasUpdated = true;
+                }
+                else
+                {
+                    localControllerData.LedColourWasUpdated = false;
+                }
+
 			}
 			else {
 				FPlatformProcess::Sleep(0.001);
 			}
 
 			// Do bluetooth IO: Orientation, Buttons, Rumble
-			for (int i = 0; i < PSMoveCount; i++)
-			{
-				//TODO: Is it necessary to keep polling until no frames are left?
-				while (psmove_poll(psmoves[i]) > 0)
-				{
-					// Update the controller status (via bluetooth)
-					psmove_poll(psmoves[i]);
+			
+            //TODO: Is it necessary to keep polling until no frames are left?
+            while (psmove_poll(psmoves[i]) > 0)
+            {
+                // Update the controller status (via bluetooth)
+                psmove_poll(psmoves[i]);
 
-					// Get the controller orientation (uses IMU).
-					psmove_get_orientation(psmoves[i],
-						&oriw, &orix, &oriy, &oriz);
-					localControllerData.OriW = oriw;
-					localControllerData.OriX = orix;
-					localControllerData.OriY = oriy;
-					localControllerData.OriZ = oriz;
-					//UE_LOG(LogPSMove, Log, TEXT("Ori w,x,y,z: %f, %f, %f, %f"), oriw, orix, oriy, oriz);
+                // Get the controller orientation (uses IMU).
+                psmove_get_orientation(psmoves[i],
+                    &oriw, &orix, &oriy, &oriz);
+                localControllerData.OriW = oriw;
+                localControllerData.OriX = orix;
+                localControllerData.OriY = oriy;
+                localControllerData.OriZ = oriz;
+                //UE_LOG(LogPSMove, Log, TEXT("Ori w,x,y,z: %f, %f, %f, %f"), oriw, orix, oriy, oriz);
 
-					// Get the controller button state
-					localControllerData.Buttons = psmove_get_buttons(psmoves[i]);  // Bitwise; tells if each button is down.
-					psmove_get_button_events(psmoves[i], &localControllerData.Pressed, &localControllerData.Released);  // i.e., state change
+                // Get the controller button state
+                localControllerData.Buttons = psmove_get_buttons(psmoves[i]);  // Bitwise; tells if each button is down.
+                psmove_get_button_events(psmoves[i], &localControllerData.Pressed, &localControllerData.Released);  // i.e., state change
 
-					// Get the controller trigger value (uint8; 0-255)
-					localControllerData.TriggerValue = psmove_get_trigger(psmoves[i]);
+                // Get the controller trigger value (uint8; 0-255)
+                localControllerData.TriggerValue = psmove_get_trigger(psmoves[i]);
 
-					// Set the controller rumble (uint8; 0-255)
-					psmove_set_rumble(psmoves[i], localControllerData.RumbleRequest);
-				}
+                // Set the controller rumble (uint8; 0-255)
+                psmove_set_rumble(psmoves[i], localControllerData.RumbleRequest);
+            }
 
-				if (localControllerData.ResetPoseRequest)
-				{
-					psmove_reset_orientation(psmoves[i]);
-					localControllerData.PoseWasReset = true;
-				}
-				else {
-					localControllerData.PoseWasReset = false;
-				}
-			}
+            if (localControllerData.ResetPoseRequest)
+            {
+                psmove_reset_orientation(psmoves[i]);
+                localControllerData.PoseWasReset = true;
+            }
+            else {
+                localControllerData.PoseWasReset = false;
+            }
+
 
 			//--------------
 			// Publish the updated worker data to the component

@@ -70,6 +70,14 @@ ADDAPI void
 ADDCALL psmove_fusion_update_transform(PSMoveFusion *fusion, float *pos_xyz, float *quat_wxyz);
 
 /**
+* \brief Resets both physical_xf and total_xf to identity matrix.
+*
+* \param fusion     A valid \ref PSMoveFusion handle
+**/
+ADDAPI void
+ADDCALL psmove_fusion_reset_transform(PSMoveFusion *fusion);
+
+/**
  * \brief Create a new PS Move Fusion object
  *
  * Creates and returns a new \ref PSMoveFusion object.
@@ -152,6 +160,23 @@ ADDCALL psmove_fusion_get_position(PSMoveFusion *fusion, PSMove *move,
         float *x, float *y, float *z);
 
 /**
+* \brief Get the 3D position of a controller
+*
+* This function returns the 3D position (relative to the camera)
+* of the motion controller, based on the current projection matrix.
+* It uses the cbb tracker algorithm.
+*
+* \param fusion A valid \ref PSMoveFusion handle
+* \param move A valid \ref PSMove handle
+* \param x A pointer to store the X part of the position vector
+* \param y A pointer to store the Y part of the position vector
+* \param z A pointer to store the Z part of the position vector
+**/
+ADDAPI void
+ADDCALL psmove_fusion_get_location(PSMoveFusion *fusion, PSMove *move,
+float *x, float *y, float *z);
+
+/**
 * \brief Get the 3D position of a controller after applying transforms
 *
 * This function returns the 3D position of the motion controller
@@ -164,7 +189,7 @@ ADDCALL psmove_fusion_get_position(PSMoveFusion *fusion, PSMove *move,
 * \param z A pointer to store the Z part of the position vector
 **/
 ADDAPI void
-ADDCALL psmove_fusion_get_transformed_position(PSMoveFusion *fusion, PSMove *move,
+ADDCALL psmove_fusion_get_transformed_location(PSMoveFusion *fusion, PSMove *move,
 float *x, float *y, float *z);
 
 /**

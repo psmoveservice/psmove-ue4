@@ -31,7 +31,6 @@
 #define PSMOVE_TRACKER_H
 
 #include "psmove.h"
-#include "psmove_config.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -40,6 +39,7 @@ extern "C" {
 /* Defines the range of x/y values for the position getting, etc.. */
 #define PSMOVE_TRACKER_DEFAULT_WIDTH 640
 #define PSMOVE_TRACKER_DEFAULT_HEIGHT 480
+#define PSMOVE_TRACKER_DEFAULT_FPS 60
 
 /* Maximum number of controllers that can be tracked at once */
 #define PSMOVE_TRACKER_MAX_CONTROLLERS 5
@@ -89,6 +89,57 @@ enum PSMoveTracker_Exposure {
     Exposure_INVALID, /*!< Invalid exposure value (for returning failures) */
 };
 
+typedef struct {
+    float dimming_factor; // dimming factor used on LED RGB values
+    int blink_delay; // number of milliseconds to wait between a blink
+    int calib_min_size; // minimum size of the estimated glowing sphere during calibration process (in pixel)
+    int calib_size_std; // maximum standard deviation (in %) of the glowing spheres found during calibration process
+    int calib_max_dist; // maximum displacement of the separate found blobs
+    int color_hue_filter_range; // +- H-Range of the hsv-colorfilter
+    int color_saturation_filter_range; // +- s-Range of the hsv-colorfilter
+    int color_value_filter_range; // +- v-Range of the hsv-colorfilter
+
+    //	/* Thresholds */
+    int roi_adjust_fps_t; // the minimum fps to be reached, if a better roi-center adjusment is to be perfomred
+    int calibration_diff_t; // during calibration, all grey values in the diff image below this value are set to black
+
+    // if tracker thresholds not met, sphere is deemed not to be found
+    float tracker_quality_t1; // minimum ratio of number of pixels in blob vs pixel of estimated circle.
+    float tracker_quality_t2; // maximum allowed change of the radius in percent, compared to the last estimated radius
+    float tracker_quality_t3; // minimum radius
+    int tracker_adaptive_xy; // specifies to use a adaptive x/y smoothing
+    int tracker_adaptive_z; // specifies to use a adaptive z smoothing
+    float color_adaption_quality; // maximal distance (calculated by 'psmove_tracker_hsvcolor_diff') between the first estimated color and the newly estimated
+    float color_update_rate; // every x seconds adapt to the color, 0 means no adaption
+
+    // if color thresholds not met, color is not adapted
+    float color_update_quality_t1; // minimum ratio of number of pixels in blob vs pixel of estimated circle.
+    float color_update_quality_t2; // maximum allowed change of the radius in percent, compared to the last estimated radius
+    float color_update_quality_t3; // minimum radius
+
+    int color_mapping_max_age; // Only re-use color mappings "younger" than this time in seconds
+
+    /* Camera Controls*/
+    int camera_frame_width;
+    int camera_frame_height;
+    int camera_frame_rate;
+    enum PSMove_Bool camera_auto_gain;
+    enum PSMove_Bool camera_auto_white_balance;
+    int camera_exposure; // [0,0xFFFF]
+    int camera_gain; // [0,0xFFFF]
+    int camera_brightness; // [0,0xFFFF]
+} PSMoveTrackerInitSettings; /*!< Structure for storing RGB image data */
+
+/**
+* \brief Initializes a tracker settings with default values
+*
+* If you want to initialize a camera with custom settings,
+* it's recommended you initialize the settings struct with this first
+*
+**/
+ADDAPI void
+ADDCALL psmove_tracker_settings_set_default(PSMoveTrackerInitSettings *settings);
+
 /**
  * \brief Create a new PS Move Tracker instance and open the camera
  *
@@ -96,11 +147,26 @@ enum PSMoveTracker_Exposure {
  * a PSEye is found, it will be used, otherwise the first available
  * camera will be used as fallback).
  *
+ * Uses default settings
+ *
  * \return A new \ref PSMoveTracker instance or \c NULL on error
  **/
 ADDAPI PSMoveTracker *
 ADDCALL psmove_tracker_new();
 
+/**
+* \brief Create a new PS Move Tracker instance and open the camera
+*
+* This will select the best camera for tracking (this means that if
+* a PSEye is found, it will be used, otherwise the first available
+* camera will be used as fallback).
+*
+* \param settings Tracker and camera settings to use
+*
+* \return A new \ref PSMoveTracker instance or \c NULL on error
+**/
+ADDAPI PSMoveTracker *
+ADDCALL psmove_tracker_new_with_settings(PSMoveTrackerInitSettings *settings);
 
 /**
  * \brief Create a new PS Move Tracker instance with a specific camera
@@ -117,6 +183,23 @@ ADDCALL psmove_tracker_new();
  **/
 ADDAPI PSMoveTracker *
 ADDCALL psmove_tracker_new_with_camera(int camera);
+
+/**
+* \brief Create a new PS Move Tracker instance with a specific camera
+*
+* This function can be used when multiple cameras are available to
+* force the use of a specific camera.
+*
+* Usually it's better to use psmove_tracker_new() and let the library
+* choose the best camera, unless you have a good reason not to.
+*
+* \param camera Zero-based index of the camera to use
+* \param settings Tracker and camera settings to use
+*
+* \return A new \ref PSMoveTracker instance or \c NULL on error
+**/
+ADDAPI PSMoveTracker *
+ADDCALL psmove_tracker_new_with_camera_and_settings(int camera, PSMoveTrackerInitSettings *settings);
 
 /**
  * \brief Configure if the LEDs of a controller should be auto-updated
@@ -517,6 +600,35 @@ ADDCALL psmove_tracker_get_image(PSMoveTracker *tracker);
 ADDAPI int
 ADDCALL psmove_tracker_get_position(PSMoveTracker *tracker,
         PSMove *move, float *x, float *y, float *radius);
+
+/**
+* \brief Get the current 3D location of a tracked controller
+*
+* This function obtains the location of a controller in the
+* world in cm.
+*
+* \param tracker A valid \ref PSMoveTracker handle
+* \param move A valid \ref PSMove handle
+* \param xcm A pointer to store the X part of the location, or \c NULL
+* \param ycm A pointer to store the Y part of the location, or \c NULL
+* \param zcm A pointer to store the Z part of the location, or \c NULL
+*
+* \return The age of the sensor reading in milliseconds, or -1 on error
+**/
+ADDAPI int
+ADDCALL psmove_tracker_get_location(PSMoveTracker *tracker,
+PSMove *move, float *xcm, float *ycm, float *zcm);
+
+
+/**
+* \brief Rest the location offsets to the current location
+*
+* \param tracker A valid \ref PSMoveTracker handle
+* \param move A valid \ref PSMove handle
+*
+**/
+ADDAPI void
+ADDCALL psmove_tracker_reset_location(PSMoveTracker *tracker, PSMove *move);
 
 /**
 * \brief Get the current 3D location of a tracked controller

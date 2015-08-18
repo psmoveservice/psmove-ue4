@@ -32,7 +32,7 @@
 
 /* This file is auto-generated from psmove_config.h.in by CMake */
 
-/* #undef PSMOVE_BUILD_TRACKER */
+#define PSMOVE_BUILD_TRACKER
 /* #undef PSMOVE_USE_PSEYE */
 /* #undef PSMOVE_USE_TRACKER_TRACE */
 
