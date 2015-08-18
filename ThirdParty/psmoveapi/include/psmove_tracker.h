@@ -201,6 +201,12 @@ ADDCALL psmove_tracker_new_with_camera(int camera);
 ADDAPI PSMoveTracker *
 ADDCALL psmove_tracker_new_with_camera_and_settings(int camera, PSMoveTrackerInitSettings *settings);
 
+ADDAPI void
+ADDCALL psmove_tracker_load_distortion(PSMoveTracker *tracker);
+
+ADDAPI void
+ADDCALL psmove_tracker_reset_distortion(PSMoveTracker *tracker);
+
 /**
  * \brief Configure if the LEDs of a controller should be auto-updated
  *
