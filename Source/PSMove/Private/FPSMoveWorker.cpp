@@ -314,6 +314,7 @@ uint32 FPSMoveWorker::Run()
             if (localControllerData.ResetPoseRequest)
             {
                 psmove_reset_orientation(psmoves[i]);
+                //TODO: reset yaw only
                 localControllerData.PoseWasReset = true;
             }
             else {
@@ -335,6 +336,12 @@ uint32 FPSMoveWorker::Run()
     for (int i = 0; i<PSMoveCount; i++)
     {
         psmove_disconnect(psmoves[i]);
+    }
+
+    // Delete the fusion
+    if (psmove_fusion)
+    {
+        psmove_fusion_free(psmove_fusion);
     }
     
     // Delete the tracker
