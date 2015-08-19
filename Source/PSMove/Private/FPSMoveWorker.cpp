@@ -180,7 +180,7 @@ uint32 FPSMoveWorker::Run()
         UE_LOG(LogPSMove, Log, TEXT("PSMove tracker initialized."));
         
         //Set exposure. TODO: Expose this to component.
-        psmove_tracker_set_exposure(psmove_tracker, Exposure_MEDIUM);  //Exposure_LOW, Exposure_MEDIUM, Exposure_HIGH
+        psmove_tracker_set_exposure(psmove_tracker, Exposure_LOW);  //Exposure_LOW, Exposure_MEDIUM, Exposure_HIGH
         psmove_tracker_set_smoothing(psmove_tracker, 0, 1);
 		psmove_tracker_set_mirror(psmove_tracker, PSMove_True);
         
@@ -342,6 +342,8 @@ uint32 FPSMoveWorker::Run()
     {
         psmove_tracker_free(psmove_tracker);
     }
+
+    psmove_shutdown();
 
     return 0;
 }
