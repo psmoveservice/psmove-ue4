@@ -159,6 +159,11 @@ bool FPSMoveWorker::AcquirePSMove(
 
 uint32 FPSMoveWorker::Run()
 {
+    if (!psmove_init(PSMOVE_CURRENT_VERSION))
+    {
+        UE_LOG(LogPSMove, Error, TEXT("PS Move API init failed (wrong version?)"));
+        return -1;
+    }
     // I want the psmoves and psmove_tracker to be local variables in the thread.
     
     // Initialize an empty array of psmove controllers
