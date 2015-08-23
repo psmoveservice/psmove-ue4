@@ -8,6 +8,8 @@ DEFINE_LOG_CATEGORY_STATIC(LogPSMove, Log, All);
  * The public interface to this module.
  */
 
+struct FPSMoveDataContext;
+
 class FPSMove : public IModuleInterface //, public IModularFeature?
 {
 public:
@@ -34,11 +36,6 @@ public:
     {
         return FModuleManager::Get().IsModuleLoaded( "PSMove" );
     }
-       
-    /**
-     * Here we declare functions that will be accessed via the module instance from within the game.
-     */
-    virtual void InitWorker();
     
 	/**
 	* Tell the PSMove module that we want to start listening to this controller.
@@ -46,4 +43,9 @@ public:
 	* @return True if we can successfully acquire the controller.
 	*/
 	virtual bool AcquirePSMove(int32 PSMoveID, FPSMoveDataContext *DataContext);
+    
+    /**
+     * Tell the PSMove module that we don't care about listening to this controller anymore.
+     */
+    virtual void ReleasePSMove(FPSMoveDataContext *DataContext);
 };

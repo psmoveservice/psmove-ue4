@@ -10,30 +10,20 @@ void FPSMove::StartupModule()
 {
     // This code will execute after your module is loaded into memory (but after global variables are initialized, of course.)
     UE_LOG(LogPSMove, Log, TEXT("Loading PSMove module..."));
+    UE_LOG(LogPSMove, Log, TEXT("Initializing PSMoveWorker Thread..."));
+    FPSMoveWorker::InitializeSingleton();
 }
 
 void FPSMove::ShutdownModule()
 {
     // This function may be called during shutdown to clean up your module.  For modules that support dynamic reloading,
     // we call this function before unloading the module.
-
-    // TODO: Kill the PSMoveWorker. That will also disconnect the controllers and tracker.
-    FPSMoveWorker::Shutdown();
-    UE_LOG(LogPSMove, Log, TEXT("Shutdown PSMove module."));
+    
+    UE_LOG(LogPSMove, Log, TEXT("Shutting down PSMove module."));
+    FPSMoveWorker::ShutdownSingleton();
 }
 
-void FPSMove::InitWorker()
-{
-    // Init the PSMoveWorker singleton if needed.
-    // This will also init the controllers and tracker if needed.
-    UE_LOG(LogPSMove, Log, TEXT("Trying to initializing PSMoveWorker..."));
-    FPSMoveWorker::PSMoveWorkerInit();
-}
-
-
-bool FPSMove::AcquirePSMove(
-	int32 PSMoveID,
-	FPSMoveDataContext *DataContext)
+bool FPSMove::AcquirePSMove(int32 PSMoveID, FPSMoveDataContext *DataContext)
 {
 	bool success = false;
 	FPSMoveWorker* WorkerSingleton = FPSMoveWorker::GetSingletonInstance();
@@ -44,4 +34,13 @@ bool FPSMove::AcquirePSMove(
 	}
 
 	return success;
+}
+
+void FPSMove::ReleasePSMove(FPSMoveDataContext *DataContext)
+{
+    FPSMoveWorker* WorkerSingleton = FPSMoveWorker::GetSingletonInstance();
+    if (WorkerSingleton != NULL)
+    {
+        WorkerSingleton->ReleasePSMove(DataContext);
+    }
 }

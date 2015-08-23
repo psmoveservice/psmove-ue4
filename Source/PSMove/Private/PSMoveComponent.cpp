@@ -3,21 +3,24 @@
 #include "FPSMove.h"
 #include "Runtime/HeadMountedDisplay/Public/HeadMountedDisplay.h"
 
-UPSMoveComponent::UPSMoveComponent(const FObjectInitializer &init)
-    : PSMoveID(0), UseHMDCorrection(true), ViewRotation(FRotator::ZeroRotator), ViewLocation(0.0), ZeroYaw(FQuat::Identity)
+UPSMoveComponent::UPSMoveComponent(const FObjectInitializer &init) :
+    PSMoveID(0),
+    UseHMDCorrection(true),
+    ViewRotation(FRotator::ZeroRotator),
+    ViewLocation(0.0),
+    ZeroYaw(FQuat::Identity)
 {
     bWantsInitializeComponent = true;
     PrimaryComponentTick.bCanEverTick = true;
 }
 
 // Called when the game starts
-void UPSMoveComponent::InitializeComponent()
+void UPSMoveComponent::BeginPlay()
 {
-    Super::InitializeComponent();
+    Super::BeginPlay();
     if (FPSMove::IsAvailable())
     {
-		// Make sure the worker thread is started (does nothing if already running)
-		FPSMove::Get().InitWorker();
+        this->DataContext.Clear();
 
 		// Bind the data context to the concurrent controller data in the worker thread
 		if (!FPSMove::Get().AcquirePSMove(this->PSMoveID, &this->DataContext))
@@ -27,17 +30,26 @@ void UPSMoveComponent::InitializeComponent()
     }
 }
 
+void UPSMoveComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+    Super::EndPlay(EndPlayReason);
+    if (FPSMove::IsAvailable() && this->DataContext.PSMoveID != -1)
+    {
+        FPSMove::Get().ReleasePSMove(&this->DataContext);
+    }
+}
+
 // Called every frame
 void UPSMoveComponent::TickComponent( float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction )
 {
     Super::TickComponent( DeltaTime, TickType, ThisTickFunction );
 
-    if (FPSMove::IsAvailable())
+    if (FPSMove::IsAvailable() && this->DataContext.PSMoveID != -1)
     {
-		// Set component driven requests
-		DataContext.SetRumbleRequest(RumbleRequest);
-		DataContext.SetLedColourRequest(LedRequest);
-		DataContext.SetResetPoseRequest(ResetPoseRequest);
+		// Post component driven requests
+        DataContext.SetRumbleRequest(this->RumbleRequest);
+		DataContext.SetLedColourRequest(this->LedRequest);
+		DataContext.SetResetPoseRequest(this->ResetPoseRequest);
 
 		// Post the above data to the worker thread
 		// and read the worker thread data the component cares about.
@@ -46,7 +58,7 @@ void UPSMoveComponent::TickComponent( float DeltaTime, ELevelTick TickType, FAct
         // Get the raw PSMove position and quaternion
 		FVector PSMPos = DataContext.GetPosition();
 		FQuat PSMOri = DataContext.GetOrientation();
-		bool PSMIsTracked = DataContext.GetIsTracked();
+		bool PSMIsTracked = DataContext.GetIsTracking();
 
         /*
         There are several steps needed to go from the PSMove reference frame to the game world reference frame.

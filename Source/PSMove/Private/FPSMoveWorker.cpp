@@ -16,108 +16,85 @@
 // -- constants ----
 static const float CONTROLLER_COUNT_POLL_INTERVAL = 1000.f; // milliseconds
 
+// -- private definitions ----
+struct TrackingContext
+{
+    FPSMoveRawSharedData_TLS *WorkerSharedData;
+    FPSMoveRawControllerWorkerData_TLS *WorkerControllerDataArray;
+    
+    PSMove* PSMoves[FPSMoveWorker::k_max_controllers];
+    uint32 LastMoveCountCheckTime;
+    
+    PSMoveTracker *PSMoveTracker;
+    int TrackerWidth;
+    int TrackerHeight;
+    
+    PSMoveFusion *PSMoveFusion;
+    
+    TrackingContext(FPSMoveRawSharedData_TLS *sharedData,
+                    FPSMoveRawControllerWorkerData_TLS *controllerDataArray) :
+        WorkerSharedData(sharedData),
+        WorkerControllerDataArray(controllerDataArray)
+    {
+        Reset();
+        
+        // This timestamp is used to throttle how frequently we poll for controller count changes
+        LastMoveCountCheckTime = FPlatformTime::Cycles();
+    }
+    
+    void Reset()
+    {
+        memset(PSMoves, 0, sizeof(PSMoves));
+        LastMoveCountCheckTime = 0;
+        PSMoveTracker = NULL;
+        TrackerWidth = 0;
+        TrackerHeight = 0;
+        PSMoveFusion = NULL;
+        
+        // Make sure all of the calibration state is reset
+        WorkerSharedData->Reset();
+    }
+};
+
+// -- prototypes ----
+static bool TrackingContextSetup(TrackingContext *context);
+static bool TrackingContextIsSetup(TrackingContext *context);
+static bool TrackingContextUpdateControllerConnections(TrackingContext *context);
+static void TrackingContextTeardown(TrackingContext *context);
+static void ControllerUpdatePositions(PSMoveTracker *psmove_tracker,
+                                      PSMoveFusion *psmove_fusion,
+                                      PSMove *psmove,
+                                      FPSMoveRawControllerData_Base *controllerData);
+static void ControllerUpdateOrientations(PSMove *psmove,
+                                         FPSMoveRawControllerData_Base *controllerData);
+static void ControllerUpdateButtonState(PSMove *psmove,
+                                        FPSMoveRawControllerData_Base *controllerData);
+
 // -- Worker Thread --
 FPSMoveWorker* FPSMoveWorker::WorkerInstance = NULL;
 
-FPSMoveWorker::FPSMoveWorker()
-    : StopTaskCounter(0)
-	, PSMoveCount(0)
-	, LastMoveCountCheckTime(0)
+FPSMoveWorker::FPSMoveWorker() :
+    AcquiredContextCounter(0),
+    StopTaskCounter(0),
+    WorkerSharedData(),
+    WorkerSharedData_Concurrent()
 {
+    // Bind the shared worker concurrent data to its corresponding thread-local container
+    WorkerSharedData.ConcurrentData = &WorkerSharedData_Concurrent;
+    
 	// Setup the controller data entries
 	for (int32 controller_index = 0; controller_index < FPSMoveWorker::k_max_controllers; ++controller_index)
 	{
-		// Make sure the controller entries are initialize
+		// Make sure the controller entries are initialized
 		WorkerControllerDataArray[controller_index].Clear();
 		WorkerControllerDataArray_Concurrent[controller_index].Clear();
 
-		// Bind the controller worker concurrent data to it's corresponding thread-local container
+		// Bind the controller worker concurrent data to its corresponding thread-local container
 		WorkerControllerDataArray[controller_index].ConcurrentData = &WorkerControllerDataArray_Concurrent[controller_index];
 	}
     
     // This Inits and Runs the thread.
     Thread = FRunnableThread::Create(this, TEXT("FPSMoveWorker"), 0, TPri_Normal);
-}
-
-bool FPSMoveWorker::UpdateControllerConnections(
-	PSMoveTracker *Tracker,
-	PSMove **PSMoves)
-{
-	bool controllerCountChanged = false;
-	uint32 currentTime = FPlatformTime::Cycles();
-	float millisecondsSinceCheck = FPlatformTime::ToMilliseconds(currentTime - this->LastMoveCountCheckTime);
-
-	if (millisecondsSinceCheck >= CONTROLLER_COUNT_POLL_INTERVAL)
-	{
-		// Update the number 
-		int newcount = psmove_count_connected();
-
-		if (this->PSMoveCount != newcount)
-		{
-			UE_LOG(LogPSMove, Log, TEXT("PSMove Controllers count changed: %d -> %d."), this->PSMoveCount, newcount);
-
-			this->PSMoveCount = newcount;
-			controllerCountChanged = true;
-		}
-
-		// Refresh the connection and tracking state of every controller entry
-		for (int psmove_id = 0; psmove_id < FPSMoveWorker::k_max_controllers; psmove_id++)
-		{
-			if (psmove_id < this->PSMoveCount)
-			{
-				if (PSMoves[psmove_id] == NULL)
-				{
-					// The controller should be connected
-					PSMoves[psmove_id] = psmove_connect_by_id(psmove_id);
-
-					if (PSMoves[psmove_id] != NULL)
-					{
-						psmove_enable_orientation(PSMoves[psmove_id], PSMove_True);
-						assert(psmove_has_orientation(PSMoves[psmove_id]));
-
-						this->WorkerControllerDataArray[psmove_id].IsConnected = true;
-					}
-					else
-					{
-						this->WorkerControllerDataArray[psmove_id].IsConnected = false;
-						UE_LOG(LogPSMove, Error, TEXT("Failed to connect to PSMove controller %d"), psmove_id);
-					}
-				}
-
-				if (PSMoves[psmove_id] != NULL && this->WorkerControllerDataArray[psmove_id].IsCalibrated == false)
-				{
-					PSMoveTracker_Status tracking_status = psmove_tracker_enable(Tracker, PSMoves[psmove_id]);
-					psmove_tracker_set_auto_update_leds(Tracker, PSMoves[psmove_id], PSMove_True);
-					
-					if (tracking_status == Tracker_CALIBRATED)
-					{
-						this->WorkerControllerDataArray[psmove_id].IsCalibrated = true;
-					}
-					else
-					{
-						UE_LOG(LogPSMove, Error, TEXT("Failed to enable tracking for PSMove controller %d (result status: %d)"), psmove_id, (int32)tracking_status);
-					}
-				}
-			}
-			else
-			{
-				// The controller should no longer be tracked
-				if (PSMoves[psmove_id] != NULL)
-				{
-					psmove_disconnect(PSMoves[psmove_id]);
-					PSMoves[psmove_id] = NULL;
-					this->WorkerControllerDataArray[psmove_id].IsTracked = false;
-					this->WorkerControllerDataArray[psmove_id].IsCalibrated = false;
-					this->WorkerControllerDataArray[psmove_id].IsConnected = false;
-				}
-			}
-		}
-
-		// Remember the last time we polled the move count
-		this->LastMoveCountCheckTime = currentTime;
-	}
-
-	return controllerCountChanged;
 }
 
 FPSMoveWorker::~FPSMoveWorker()
@@ -149,7 +126,11 @@ bool FPSMoveWorker::AcquirePSMove(
 		// is now watching this block of data.
 		// Also this is thread safe because were not actually looking at the concurrent data
 		// at this point, just assigning a pointer to the concurrent data.
+        DataContext->RawSharedData.ConcurrentData = &WorkerSharedData_Concurrent;
 		DataContext->RawControllerData.ConcurrentData = &WorkerControllerDataArray_Concurrent[PSMoveID];
+        
+        // The worker thread will create a tracker if one isn't active at this moment
+        AcquiredContextCounter.Increment();
 
 		success = true;
 	}
@@ -157,199 +138,183 @@ bool FPSMoveWorker::AcquirePSMove(
 	return success;
 }
 
+void FPSMoveWorker::ReleasePSMove(FPSMoveDataContext *DataContext)
+{
+    if (DataContext->PSMoveID != -1)
+    {
+        DataContext->Clear();
+        
+        // The worker thread will tear-down the tracker
+        assert(AcquiredContextCounter.GetValue() > 0);
+        AcquiredContextCounter.Decrement();
+    }
+}
+
 uint32 FPSMoveWorker::Run()
 {
+    // Maintains the following psmove state on the stack
+    // * psmove tracking state
+    // * psmove fusion state
+    // * psmove controller state
+    // Tracking state is only initialized when we have a non-zero number of tracking contexts
+    TrackingContext Context(&WorkerSharedData, WorkerControllerDataArray);
+    
     if (!psmove_init(PSMOVE_CURRENT_VERSION))
     {
         UE_LOG(LogPSMove, Error, TEXT("PS Move API init failed (wrong version?)"));
         return -1;
     }
-    // I want the psmoves and psmove_tracker to be local variables in the thread.
     
-    // Initialize an empty array of psmove controllers
-	PSMove* psmoves[FPSMoveWorker::k_max_controllers];
-	memset(psmoves, 0, sizeof(psmoves));
-
-    // Initialize and configure the psmove_tracker
-    PSMoveTracker *psmove_tracker = psmove_tracker_new(); // Unfortunately the API does not have a way to change the resolution and framerate.
-    PSMoveFusion *psmove_fusion = psmove_fusion_new(psmove_tracker, 1., 1000.);
-    int tracker_width = 640;
-    int tracker_height = 480;
-    if (psmove_tracker)
-    {
-        UE_LOG(LogPSMove, Log, TEXT("PSMove tracker initialized."));
-        
-        //Set exposure. TODO: Expose this to component.
-        psmove_tracker_set_exposure(psmove_tracker, Exposure_LOW);  //Exposure_LOW, Exposure_MEDIUM, Exposure_HIGH
-        psmove_tracker_set_smoothing(psmove_tracker, 0, 1);
-		psmove_tracker_set_mirror(psmove_tracker, PSMove_True);
-        
-        psmove_tracker_get_size(psmove_tracker, &tracker_width, &tracker_height);
-        UE_LOG(LogPSMove, Log, TEXT("Camera Dimensions: %d x %d"), tracker_width, tracker_height);
-    }
-    else {
-        UE_LOG(LogPSMove, Log, TEXT("PSMove tracker failed to initialize."));
-    }
-    
-    //Initial wait before starting.
-    FPlatformProcess::Sleep(0.03);
-
-    float xcm, ycm, zcm, oriw, orix, oriy, oriz;
     while (StopTaskCounter.GetValue() == 0)
-    {        
-        // Get positional data from tracker
-        if (psmove_tracker)
-        {            
-			// Setup or tear down controller connections based on the number of active controllers
-			UpdateControllerConnections(psmove_tracker, psmoves);
-
-			// Renew the image on camera
-			if (PSMoveCount > 0)
-			{
-				psmove_tracker_update_image(psmove_tracker); // Sometimes libusb crashes here.
-				psmove_tracker_update_cbb(psmove_tracker, NULL); // Passing null (instead of m_moves[i]) updates all controllers.
-			}
-		}
-		else {
-			FPlatformProcess::Sleep(0.001);
-		}
-
-		for (int i = 0; i < PSMoveCount; i++)
-		{
-			FPSMoveRawControllerData_TLS &localControllerData = WorkerControllerDataArray[i];
-
-			//--------------
-			// Read the published data from the component
-			//--------------
-			localControllerData.WorkerRead();
-
-			// Get positional data from tracker
-			if (psmove_tracker)
+    {
+        // If there are component contexts active, make sure the tracking context is setup
+        if (AcquiredContextCounter.GetValue() > 0 && !TrackingContextIsSetup(&Context))
+        {
+            TrackingContextSetup(&Context);
+        }
+        // If there are no component contexts active, make sure the tracking context is torn-down
+        else if (AcquiredContextCounter.GetValue() <= 0 && TrackingContextIsSetup(&Context))
+        {
+            TrackingContextTeardown(&Context);
+        }
+        
+        // Update controller state while tracking is active
+        if (TrackingContextIsSetup(&Context))
+        {
+            QUICK_SCOPE_CYCLE_COUNTER(Stat_FPSMoveWorker_RunLoop)
+            
+            //--------------
+            // Read the published data from the components
+            //--------------
+            WorkerSharedData.WorkerRead();
+            
+            // Setup or tear down controller connections based on the number of active controllers
             {
-                localControllerData.IsTracked = psmove_tracker_get_status(psmove_tracker, psmoves[i]) == Tracker_TRACKING;
-
-                psmove_fusion_get_transformed_location(psmove_fusion, psmoves[i], &xcm, &ycm, &zcm);
-
-                if (localControllerData.IsTracked &&
-                    xcm && ycm && zcm &&
-                    !isnan(xcm) && !isnan(ycm) && !isnan(zcm) &&
-                    xcm == xcm && ycm == ycm && zcm == zcm)
+                const bool countrollerCountChanged = TrackingContextUpdateControllerConnections(&Context);
+            }
+            
+            // Update the raw positions of the controllers
+            {
+                QUICK_SCOPE_CYCLE_COUNTER(Stat_FPSMoveWorker_UpdateImage)
+                
+                // Renew the image on camera
+                psmove_tracker_update_image(Context.PSMoveTracker); // Sometimes libusb crashes here.
+            }
+            
+            // Update the raw positions on the local controller data
+            {
+                QUICK_SCOPE_CYCLE_COUNTER(Stat_FPSMoveWorker_Position)
+                
+                for (int psmove_id = 0; psmove_id < WorkerSharedData.PSMoveCount; psmove_id++)
                 {
-                    localControllerData.PosX = xcm;
-                    localControllerData.PosY = ycm;
-                    localControllerData.PosZ = zcm;
+                    FPSMoveRawControllerWorkerData_TLS &localControllerData = WorkerControllerDataArray[psmove_id];
+                    
+                    ControllerUpdatePositions(Context.PSMoveTracker,
+                                              Context.PSMoveFusion,
+                                              Context.PSMoves[psmove_id],
+                                              &localControllerData);
                 }
-                else {
-                    localControllerData.IsTracked = false;
-                }
-
-                //UE_LOG(LogPSMove, Log, TEXT("X: %f, Y: %f, Z: %f"), xcm, ycm, zcm);
-                if (localControllerData.ResetPoseRequest && localControllerData.IsTracked)
+            }
+            
+            // Do bluetooth IO: Orientation, Buttons, Rumble
+            {
+                QUICK_SCOPE_CYCLE_COUNTER(Stat_FPSMoveWorker_Polling)
+                
+                for (int psmove_id = 0; psmove_id < WorkerSharedData.PSMoveCount; psmove_id++)
                 {
-                    psmove_tracker_reset_location(psmove_tracker, psmoves[i]);
-                }
-
-                // If we are to change the tracked colour.
-                if (localControllerData.UpdateLedRequest)
-                {
-                    // Stop tracking the controller with the existing color
-                    psmove_tracker_disable(psmove_tracker, psmoves[i]);
-                    localControllerData.IsTracked = false;
-                    localControllerData.IsCalibrated = false;
-
-                    psmove_tracker_set_dimming(psmove_tracker, 0.0);  // Set dimming to 0 to trigger blinking calibration.
-                    psmove_set_leds(psmoves[i], 0, 0, 0);  // Turn off the LED to make sure it isn't trackable until new colour set.
-                    psmove_update_leds(psmoves[i]);
-                    FColor newFColor = localControllerData.LedColourRequest.Quantize();
-
-                    if (psmove_tracker_enable_with_color(psmove_tracker, psmoves[i], newFColor.R, newFColor.G, newFColor.B) == Tracker_CALIBRATED)
+                    //TODO: Is it necessary to keep polling until no frames are left?
+                    while (psmove_poll(Context.PSMoves[psmove_id]) > 0)
                     {
-                        this->WorkerControllerDataArray[i].IsCalibrated = true;
+                        FPSMoveRawControllerWorkerData_TLS &localControllerData = WorkerControllerDataArray[psmove_id];
+                        
+                        // Update the controller status (via bluetooth)
+                        psmove_poll(Context.PSMoves[psmove_id]);  // Necessary to poll yet again?
+                        
+                        // Store the controller orientation
+                        ControllerUpdateOrientations(Context.PSMoves[psmove_id], &localControllerData);
+                        
+                        // Store the button state
+                        ControllerUpdateButtonState(Context.PSMoves[psmove_id], &localControllerData);
+                        
+                        // Publish the worker data to the component
+                        localControllerData.WorkerPost();
+                        // Read back the published data from the component
+                        localControllerData.WorkerRead();
+                        
+                        // Set the controller rumble (uint8; 0-255)
+                        psmove_set_rumble(Context.PSMoves[psmove_id], localControllerData.RumbleRequest);
+                        
+                        // See if the reset orientation request has been posted by the component
+                        if (localControllerData.ResetPoseRequest)
+                        {
+                            UE_LOG(LogPSMove, Log, TEXT("FPSMoveWorker:: RESET ORIENTATION"));
+                            
+                            psmove_reset_orientation(Context.PSMoves[psmove_id]);
+                            psmove_tracker_reset_location(Context.PSMoveTracker, Context.PSMoves[psmove_id]);
+                            
+                            // Clear the request flag now that we've handled the request
+                            localControllerData.ResetPoseRequest = false;
+                        }
+                        
+                        // See if an LED change has been posted by the component.
+                        if (localControllerData.UpdateLedRequest)
+                        {
+                            // TODO: Change the following to use the tracker context.
+                            /*
+                             psmove_tracker_disable(Context.PSMoveTracker, psmove);
+                             psmove_tracker_set_dimming(Context.PSMoves[psmove_id], 0.0);  // Set dimming to 0 to trigger blinking calibration.
+                             psmove_set_leds(Context.PSMoves[psmove_id], 0, 0, 0);         // Turn off the LED to make sure it isn't trackable until new colour set.
+                             psmove_update_leds(Context.PSMoves[psmove_id]);
+                             FColor newFColor = localControllerData.LedColourRequest;
+                             
+                             if (psmove_tracker_enable_with_color(Context.PSMoveTracker, Context.PSMoves[psmove_id], newFColor.R, newFColor.G, newFColor.B) == Tracker_CALIBRATED)
+                             {
+                                localControllerData.something = something.
+                             }
+                             else
+                             {
+                                UE_LOG(LogPSMove, Error, TEXT("Failed to change tracking color for PSMove controller %d"), i);
+                             }
+                             
+                             localControllerData.UpdateLedRequest = false;
+                             */
+                        }
                     }
-                    else
-                    {
-                        UE_LOG(LogPSMove, Error, TEXT("Failed to change tracking color for PSMove controller %d"), i);
-                    }
-
-                    localControllerData.LedColourWasUpdated = true;
                 }
-                else
+            }
+            
+            // Update the position
+            {
+                QUICK_SCOPE_CYCLE_COUNTER(Stat_FPSMoveWorker_Filtering)
+                
+                for (int psmove_id = 0; psmove_id < WorkerSharedData.PSMoveCount; psmove_id++)
                 {
-                    localControllerData.LedColourWasUpdated = false;
+                    FPSMoveRawControllerWorkerData_TLS &localControllerData = WorkerControllerDataArray[psmove_id];
+                    
+                    // Refresh the clock for the controller.
+                    // Was needed for filter. Still needed?
+                    localControllerData.Clock.Update();
                 }
-
-			}
-			else {
-				FPlatformProcess::Sleep(0.001);
-			}
-
-			// Do bluetooth IO: Orientation, Buttons, Rumble
-			
-            //TODO: Is it necessary to keep polling until no frames are left?
-            while (psmove_poll(psmoves[i]) > 0)
-            {
-                // Update the controller status (via bluetooth)
-                psmove_poll(psmoves[i]);
-
-                // Get the controller orientation (uses IMU).
-                psmove_get_orientation(psmoves[i],
-                    &oriw, &orix, &oriy, &oriz);
-                localControllerData.OriW = oriw;
-                localControllerData.OriX = orix;
-                localControllerData.OriY = oriy;
-                localControllerData.OriZ = oriz;
-                //UE_LOG(LogPSMove, Log, TEXT("Ori w,x,y,z: %f, %f, %f, %f"), oriw, orix, oriy, oriz);
-
-                // Get the controller button state
-                localControllerData.Buttons = psmove_get_buttons(psmoves[i]);  // Bitwise; tells if each button is down.
-                psmove_get_button_events(psmoves[i], &localControllerData.Pressed, &localControllerData.Released);  // i.e., state change
-
-                // Get the controller trigger value (uint8; 0-255)
-                localControllerData.TriggerValue = psmove_get_trigger(psmoves[i]);
-
-                // Set the controller rumble (uint8; 0-255)
-                psmove_set_rumble(psmoves[i], localControllerData.RumbleRequest);
             }
-
-            if (localControllerData.ResetPoseRequest)
-            {
-                psmove_reset_orientation(psmoves[i]);
-                //TODO: reset yaw only
-                localControllerData.PoseWasReset = true;
-            }
-            else {
-                localControllerData.PoseWasReset = false;
-            }
-
-
-			//--------------
-			// Publish the updated worker data to the component
-			//--------------
-			localControllerData.WorkerPost();
-        }    
-
-        //Sleeping the thread seems to crash libusb.
-        //FPlatformProcess::Sleep(0.005);        
+            
+            //--------------
+            // Publish the worker data to the component
+            //--------------
+            WorkerSharedData.WorkerPost();
+        }
+        else
+        {
+            // Wait again before trying to activate the camera
+            FPlatformProcess::Sleep(1);
+        }
     }
     
-    // Delete the controllers
-    for (int i = 0; i<PSMoveCount; i++)
+    if (!TrackingContextIsSetup(&Context))
     {
-        psmove_disconnect(psmoves[i]);
+        TrackingContextTeardown(&Context);
     }
 
-    // Delete the fusion
-    if (psmove_fusion)
-    {
-        psmove_fusion_free(psmove_fusion);
-    }
-    
-    // Delete the tracker
-    if (psmove_tracker)
-    {
-        psmove_tracker_free(psmove_tracker);
-    }
-
+    // Free any dependent APIs
     psmove_shutdown();
 
     return 0;
@@ -360,9 +325,9 @@ void FPSMoveWorker::Stop()
     StopTaskCounter.Increment();
 }
 
-FPSMoveWorker* FPSMoveWorker::PSMoveWorkerInit()
+FPSMoveWorker* FPSMoveWorker::InitializeSingleton()
 {
-    UE_LOG(LogPSMove, Log, TEXT("FPSMoveWorker::PSMoveWorkerInit"));
+    UE_LOG(LogPSMove, Log, TEXT("FPSMoveWorker::InitializeSingleton"));
     if (!WorkerInstance && FPlatformProcess::SupportsMultithreading())
     {
         UE_LOG(LogPSMove, Log, TEXT("Creating new FPSMoveWorker instance."));
@@ -373,7 +338,7 @@ FPSMoveWorker* FPSMoveWorker::PSMoveWorkerInit()
     return WorkerInstance;
 }
 
-void FPSMoveWorker::Shutdown()
+void FPSMoveWorker::ShutdownSingleton()
 {
     if (WorkerInstance)
     {
@@ -384,4 +349,246 @@ void FPSMoveWorker::Shutdown()
         WorkerInstance = NULL;
         UE_LOG(LogPSMove, Log, TEXT("PSMoveWorker instance destroyed."));
     }
+}
+
+//-- private methods ----
+static bool TrackingContextSetup(TrackingContext *context)
+{
+    bool success = true;
+    
+    // Clear out the tracking state
+    // Reset the shared worker data
+    context->Reset();
+    
+    UE_LOG(LogPSMove, Log, TEXT("Setting up PSMove Tracking Context"));
+    
+    // Initialize and configure the psmove_tracker.
+    // This can fail if the
+    // TODO: Expose API to allow setting resolution/framerate
+    {
+        PSMoveTrackerInitSettings settings;
+        
+        psmove_tracker_settings_set_default(&settings);
+        settings.color_mapping_max_age = 0; // Don't used cached color mapping file
+        
+        context->PSMoveTracker = psmove_tracker_new_with_settings(&settings);
+    }
+    
+    if (context->PSMoveTracker != NULL)
+    {
+        //Set exposure. TODO: Make this configurable.
+        psmove_tracker_set_exposure(context->PSMoveTracker, Exposure_LOW);
+        psmove_tracker_set_smoothing(context->PSMoveTracker, 0, 1);
+        psmove_tracker_set_mirror(context->PSMoveTracker, PSMove_True);
+        psmove_tracker_get_size(context->PSMoveTracker, &context->TrackerWidth, &context->TrackerHeight);
+        
+        UE_LOG(LogPSMove, Log, TEXT("PSMove tracker initialized."));
+        UE_LOG(LogPSMove, Log, TEXT("Camera Dimensions: %f x %f"), context->TrackerWidth, context->TrackerHeight);
+    }
+    else
+    {
+        UE_LOG(LogPSMove, Error, TEXT("PSMove tracker failed to initialize."));
+        success = false;
+    }
+    
+    // Initialize fusion api if the tracker started
+    if (success)
+    {
+        context->PSMoveFusion = psmove_fusion_new(context->PSMoveTracker, 1.0f, 1000.0f);
+        
+        if (context->PSMoveFusion != NULL)
+        {
+            UE_LOG(LogPSMove, Log, TEXT("PSMove fusion initialized."));
+        }
+        else
+        {
+            UE_LOG(LogPSMove, Error, TEXT("PSMove failed to initialize."));
+            success = false;
+        }
+    }
+    
+    if (!success)
+    {
+        TrackingContextTeardown(context);
+    }
+    
+    return success;
+}
+
+static bool TrackingContextIsSetup(TrackingContext *context)
+{
+    return context->PSMoveTracker != NULL && context->PSMoveFusion != NULL;
+}
+
+static bool TrackingContextUpdateControllerConnections(TrackingContext *context)
+{
+    bool controllerCountChanged = false;
+    uint32 currentTime = FPlatformTime::Cycles();
+    float millisecondsSinceCheck = FPlatformTime::ToMilliseconds(currentTime - context->LastMoveCountCheckTime);
+    
+    assert(TrackingContextIsSetup(context));
+    
+    if (millisecondsSinceCheck >= CONTROLLER_COUNT_POLL_INTERVAL)
+    {
+        // Update the number
+        int newcount = psmove_count_connected();
+        
+        if (context->WorkerSharedData->PSMoveCount != newcount)
+        {
+            UE_LOG(LogPSMove, Log, TEXT("PSMove Controllers count changed: %d -> %d."), context->WorkerSharedData->PSMoveCount, newcount);
+            
+            context->WorkerSharedData->PSMoveCount = newcount;
+            controllerCountChanged = true;
+        }
+        
+        // Refresh the connection and tracking state of every controller entry
+        for (int psmove_id = 0; psmove_id < FPSMoveWorker::k_max_controllers; psmove_id++)
+        {
+            if (psmove_id < context->WorkerSharedData->PSMoveCount)
+            {
+                if (context->PSMoves[psmove_id] == NULL)
+                {
+                    // The controller should be connected
+                    context->PSMoves[psmove_id] = psmove_connect_by_id(psmove_id);
+                    
+                    if (context->PSMoves[psmove_id] != NULL)
+                    {
+                        psmove_enable_orientation(context->PSMoves[psmove_id], PSMove_True);
+                        assert(psmove_has_orientation(context->PSMoves[psmove_id]));
+                        
+                        context->WorkerControllerDataArray[psmove_id].IsConnected = true;
+                    }
+                    else
+                    {
+                        context->WorkerControllerDataArray[psmove_id].IsConnected = false;
+                        UE_LOG(LogPSMove, Error, TEXT("Failed to connect to PSMove controller %d"), psmove_id);
+                    }
+                }
+                
+                if (context->PSMoves[psmove_id] != NULL && context->WorkerControllerDataArray[psmove_id].IsEnabled == false)
+                {
+                    // The controller is connected, but not tracking yet
+                    if (psmove_tracker_enable(context->PSMoveTracker, context->PSMoves[psmove_id]) == Tracker_CALIBRATED)
+                    {
+                        //TODO: psmove_tracker_enable_with_color(psmove_tracker, psmoves[i], r, g, b)
+                        //TODO: psmove_tracker_get_color(psmove_tracker, psmoves[i], unisgned char &r, &g, &b);
+                        
+                        context->WorkerControllerDataArray[psmove_id].Clock.Initialize();
+                        context->WorkerControllerDataArray[psmove_id].IsEnabled = true;
+                    }
+                    else
+                    {
+                        UE_LOG(LogPSMove, Error, TEXT("Failed to enable tracking for PSMove controller %d"), psmove_id);
+                    }
+                }
+            }
+            else
+            {// The controller should no longer be tracked
+                if (context->PSMoves[psmove_id] != NULL)
+                {
+                    psmove_disconnect(context->PSMoves[psmove_id]);
+                    context->PSMoves[psmove_id] = NULL;
+                    context->WorkerControllerDataArray[psmove_id].IsEnabled = false;
+                    context->WorkerControllerDataArray[psmove_id].IsConnected = false;
+                }
+            }
+        }
+        
+        // Remember the last time we polled the move count
+        context->LastMoveCountCheckTime = currentTime;
+    }
+    
+    return controllerCountChanged;
+}
+
+static void TrackingContextTeardown(TrackingContext *context)
+{
+    UE_LOG(LogPSMove, Log, TEXT("Tearing down PSMove Tracking Context"));
+    
+    // Delete the controllers
+    for (int psmove_id = 0; psmove_id < FPSMoveWorker::k_max_controllers; psmove_id++)
+    {
+        if (context->PSMoves[psmove_id] != NULL)
+        {
+            UE_LOG(LogPSMove, Log, TEXT("Disconnecting PSMove controller %d"), psmove_id);
+            context->WorkerControllerDataArray[psmove_id].IsConnected = false;
+            context->WorkerControllerDataArray[psmove_id].IsEnabled = false;
+            psmove_disconnect(context->PSMoves[psmove_id]);
+        }
+    }
+    
+    // Delete the tracking fusion state
+    if (context->PSMoveFusion != NULL)
+    {
+        UE_LOG(LogPSMove, Log, TEXT("PSMove fusion disposed"));
+        psmove_fusion_free(context->PSMoveFusion);
+    }
+    
+    // Delete the tracker state
+    if (context->PSMoveTracker != NULL)
+    {
+        UE_LOG(LogPSMove, Log, TEXT("PSMove tracker disposed"));
+        psmove_tracker_free(context->PSMoveTracker);
+    }
+    
+    context->Reset();
+}
+
+static void ControllerUpdatePositions(PSMoveTracker *psmove_tracker,
+                                      PSMoveFusion *psmove_fusion,
+                                      PSMove *psmove,
+                                      FPSMoveRawControllerData_Base *controllerData)
+{
+    // Find the sphere position in the camera
+    int found_sphere_count = 0;
+    
+    {
+        QUICK_SCOPE_CYCLE_COUNTER(Stat_FPSMoveWorker_TrackerUpdate)
+        found_sphere_count = psmove_tracker_update_cbb(psmove_tracker, psmove);
+    }
+    
+    // Can we actually see the controller this frame?
+    controllerData->IsTracking = (found_sphere_count > 0);
+
+    // Update the position of the controller
+    if (controllerData->IsTracking)
+    {
+        QUICK_SCOPE_CYCLE_COUNTER(Stat_FPSMoveWorker_TrackerFusion)
+        
+        float xcm, ycm, zcm;
+        psmove_fusion_get_transformed_location(psmove_fusion, psmove, &xcm, &ycm, &zcm);
+        
+        // [Store the controller position]
+        // Remember the position the ps move controller in either its native space
+        // or in a transformed space if a transform file existed.
+        controllerData->PSMovePosition = FVector(xcm, ycm, zcm);
+    }
+}
+
+static void ControllerUpdateOrientations(PSMove *psmove,
+                                         FPSMoveRawControllerData_Base *controllerData)
+{
+    float oriw, orix, oriy, oriz;
+    
+    // Get the controller orientation (uses IMU).
+    psmove_get_orientation(psmove, &oriw, &orix, &oriy, &oriz);
+    
+    controllerData->PSMoveOrientation = FQuat(orix, oriy, oriz, oriw);
+    
+    /*
+    controllerData->WorldRelativeFilteredOrientation =
+    // Convert from the controller coordinate system to Unreal's coordinate system where
+    FQuat(oriz, -orix, -oriy, oriw);
+    */
+}
+
+static void ControllerUpdateButtonState(PSMove *psmove,
+                                        FPSMoveRawControllerData_Base *controllerData)
+{
+    // Get the controller button state
+    controllerData->Buttons = psmove_get_buttons(psmove);  // Bitwise; tells if each button is down.
+    psmove_get_button_events(psmove, &controllerData->Pressed, &controllerData->Released);  // i.e., state change
+    
+    // Get the controller trigger value (uint8; 0-255)
+    controllerData->TriggerValue = psmove_get_trigger(psmove);
 }

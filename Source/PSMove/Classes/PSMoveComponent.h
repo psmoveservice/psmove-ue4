@@ -14,9 +14,15 @@ public:
     //Sets default values for properties.
     UPSMoveComponent();
 
-    virtual void InitializeComponent() override;
-
+    virtual void BeginPlay() override;
+    
+    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+    
     virtual void TickComponent( float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction ) override;
+    
+    // Player Index - 0-based
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = PSMove)
+    int32 PlayerIndex;
 
     // PSMove controller ID - 0-based
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = PSMove)
@@ -50,30 +56,30 @@ public:
     UPROPERTY(BlueprintAssignable, Category = PSMove)
     FPSMoveDataUpdatedDelegate OnDataUpdated;
     
-    // Delegates for buttons. Triggered once per frame if button is down or changes state
+    // Delegates for buttons.
     UPROPERTY(BlueprintAssignable, Category = PSMove)
-    FPSMoveTriangleButtonDelegate OnTriangleButton;
+    FPSMoveButtonStateDelegate OnTriangleButton;
     
     UPROPERTY(BlueprintAssignable, Category = PSMove)
-    FPSMoveCircleButtonDelegate OnCircleButton;
+    FPSMoveButtonStateDelegate OnCircleButton;
     
     UPROPERTY(BlueprintAssignable, Category = PSMove)
-    FPSMoveCrossButtonDelegate OnCrossButton;
+    FPSMoveButtonStateDelegate OnCrossButton;
     
     UPROPERTY(BlueprintAssignable, Category = PSMove)
-    FPSMoveSquareButtonDelegate OnSquareButton;
+    FPSMoveButtonStateDelegate OnSquareButton;
     
     UPROPERTY(BlueprintAssignable, Category = PSMove)
-    FPSMoveSelectButtonDelegate OnSelectButton;
+    FPSMoveButtonStateDelegate OnSelectButton;
     
     UPROPERTY(BlueprintAssignable, Category = PSMove)
-    FPSMoveStartButtonDelegate OnStartButton;
+    FPSMoveButtonStateDelegate OnStartButton;
     
     UPROPERTY(BlueprintAssignable, Category = PSMove)
-    FPSMovePSButtonDelegate OnPSButton;
+    FPSMoveButtonStateDelegate OnPSButton;
     
     UPROPERTY(BlueprintAssignable, Category = PSMove)
-    FPSMoveMoveButtonDelegate OnMoveButton;
+    FPSMoveButtonStateDelegate OnMoveButton;
     
     UPROPERTY(BlueprintAssignable, Category = PSMove)
     FPSMoveTriggerButtonDelegate OnTriggerButton;
@@ -84,5 +90,4 @@ private:
     FQuat ZeroYaw;
     FVector LastPosition;
     FQuat LastOrientation;
-    
 };
