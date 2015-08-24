@@ -378,7 +378,6 @@ static bool TrackingContextSetup(TrackingContext *context)
     {
         //Set exposure. TODO: Make this configurable.
         psmove_tracker_set_exposure(context->PSMoveTracker, Exposure_LOW);
-        psmove_tracker_set_smoothing(context->PSMoveTracker, 0, 1);
         psmove_tracker_set_mirror(context->PSMoveTracker, PSMove_True);
         psmove_tracker_get_size(context->PSMoveTracker, &context->TrackerWidth, &context->TrackerHeight);
         
