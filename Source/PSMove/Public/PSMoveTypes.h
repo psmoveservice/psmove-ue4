@@ -97,9 +97,9 @@ struct FPSMoveRawSharedData_TLS : public FPSMoveRawSharedData_Base
         this->WorkerHasModifiedTLSData = true;
     }
     
-    void ComponentPostAndRead()
+    void ComponentRead()
     {
-        FPSMoveHitchWatchdog watchdog(TEXT("FPSMoveRawSharedData_TLS::ComponentPostAndRead"), 500);
+        FPSMoveHitchWatchdog watchdog(TEXT("FPSMoveRawSharedData_TLS::ComponentRead"), 500);
         
         {
             FScopeLock scopeLock(&ConcurrentData->Lock);
@@ -110,6 +110,15 @@ struct FPSMoveRawSharedData_TLS : public FPSMoveRawSharedData_Base
             // We've read the data the worker posted, so it's no longer dirty
             this->ComponentHasReadWorkerData = true;
             ConcurrentData->ComponentHasReadWorkerData = true;
+        }
+    }
+
+    void ComponentPost()
+    {
+        FPSMoveHitchWatchdog watchdog(TEXT("FPSMoveRawSharedData_TLS::ComponentPost"), 500);
+
+        {
+            FScopeLock scopeLock(&ConcurrentData->Lock);
         }
     }
     
@@ -183,24 +192,18 @@ struct FPSMoveRawControllerData_Base
     UPROPERTY()
     bool IsCalibrated;          // I don't know
 
-    bool LedColourWasUpdated;   // true if the LED colour was updated
-    bool PoseWasReset;          // true if the pose was reset
-
     // -------
     // Data items that typically get filled by the game object (i.e., PSMoveComponent)
     // then are passed to the worker thread.
-    
-    bool UpdateLedRequest;          // Please update the LEDs
 
     UPROPERTY()
     uint8 RumbleRequest;            // Please make the controller rumbled
 
-    UPROPERTY()
-    FLinearColor LedColourRequest;  // Please change the LED colour
-
-    UPROPERTY()
     bool ResetPoseRequest;          // Please use the current pose as zero-pose.
-    
+
+    bool CycleColourRequest;        // Please change to the next available colour.
+
+    // -----------
     // Constructor
     FPSMoveRawControllerData_Base()
     {
@@ -216,11 +219,8 @@ struct FPSMoveRawControllerData_Base
         Released = 0;
         TriggerValue = 0;
         RumbleRequest = 0;
-        LedColourRequest = FColor();
-        LedColourWasUpdated = false;
-        UpdateLedRequest = false;
         ResetPoseRequest = false;
-        PoseWasReset = false;
+        CycleColourRequest = false;
         IsConnected = false;
         IsCalibrated = false;
         IsTracking = false;
@@ -276,17 +276,11 @@ struct FPSMoveRawControllerData_TLS : public FPSMoveRawControllerData_Base
         return ConcurrentData != nullptr;
     }
 
-    void ComponentPostAndRead()
+    void ComponentRead()
     {
         FPSMoveHitchWatchdog watchdog(TEXT("FPSMoveRawControllerData_TLS::ComponentPostAndRead"), 500);
         {
             FScopeLock scopeLock(&ConcurrentData->Lock);
-
-            // Post the component thread's data to the worker thread's data
-            ConcurrentData->RumbleRequest = this->RumbleRequest;
-            ConcurrentData->LedColourRequest = this->LedColourRequest;
-            ConcurrentData->ResetPoseRequest = this->ResetPoseRequest;
-            ConcurrentData->UpdateLedRequest = this->UpdateLedRequest;
 
             // Read the worker thread's data into the component thread's data
             this->PSMovePosition = ConcurrentData->PSMovePosition;
@@ -299,8 +293,22 @@ struct FPSMoveRawControllerData_TLS : public FPSMoveRawControllerData_Base
             this->IsTracking = ConcurrentData->IsTracking;
             this->IsEnabled = ConcurrentData->IsEnabled;
             this->IsCalibrated = ConcurrentData->IsCalibrated;
-            this->LedColourWasUpdated = ConcurrentData->LedColourWasUpdated;
-            this->PoseWasReset = ConcurrentData->PoseWasReset;
+
+            this->CycleColourRequest = ConcurrentData->CycleColourRequest;
+            this->ResetPoseRequest = ConcurrentData->ResetPoseRequest;
+        }
+    }
+
+    void ComponentPost()
+    {
+        FPSMoveHitchWatchdog watchdog(TEXT("FPSMoveRawControllerData_TLS::ComponentPostAndRead"), 500);
+        {
+            FScopeLock scopeLock(&ConcurrentData->Lock);
+
+            // Post the component thread's data to the worker thread's data
+            ConcurrentData->RumbleRequest = this->RumbleRequest;
+            ConcurrentData->ResetPoseRequest = this->ResetPoseRequest;
+            ConcurrentData->CycleColourRequest = this->CycleColourRequest;
         }
     }
 
@@ -310,9 +318,8 @@ struct FPSMoveRawControllerData_TLS : public FPSMoveRawControllerData_Base
 
         // Read the component thread's data into the worker thread's data
         this->RumbleRequest = ConcurrentData->RumbleRequest;
-        this->LedColourRequest = ConcurrentData->LedColourRequest;
         this->ResetPoseRequest = ConcurrentData->ResetPoseRequest;
-        this->UpdateLedRequest = ConcurrentData->UpdateLedRequest;
+        this->CycleColourRequest = ConcurrentData->CycleColourRequest;
     }
 
     void WorkerPost()
@@ -330,8 +337,10 @@ struct FPSMoveRawControllerData_TLS : public FPSMoveRawControllerData_Base
         ConcurrentData->IsCalibrated = this->IsCalibrated;
         ConcurrentData->IsTracking = this->IsTracking;
         ConcurrentData->IsEnabled = this->IsEnabled;
-        ConcurrentData->LedColourWasUpdated = this->LedColourWasUpdated;
-        ConcurrentData->PoseWasReset = this->PoseWasReset;
+
+        // Switches to indicate whether or not the pose needs to be reset or the colour needs to be cycled.
+        ConcurrentData->ResetPoseRequest = this->ResetPoseRequest;
+        ConcurrentData->CycleColourRequest = this->CycleColourRequest;
     }
 };
 
@@ -346,16 +355,29 @@ struct FPSMoveDataContext
     FPSMoveRawSharedData_TLS RawSharedData;
     FPSMoveRawControllerData_TLS RawControllerData;
     
-    void ComponentPostAndRead()
+    void ComponentRead()
     {
         if (RawSharedData.IsValid())
         {
-            RawSharedData.ComponentPostAndRead();
+            RawSharedData.ComponentRead();
         }
         
         if (RawControllerData.IsValid())
         {
-            RawControllerData.ComponentPostAndRead();
+            RawControllerData.ComponentRead();
+        }
+    }
+
+    void ComponentPost()
+    {
+        if (RawSharedData.IsValid())
+        {
+            RawSharedData.ComponentPost();
+        }
+
+        if (RawControllerData.IsValid())
+        {
+            RawControllerData.ComponentPost();
         }
     }
 
@@ -506,28 +528,23 @@ struct FPSMoveDataContext
         }
     }
 
-    void SetLedColourRequest(FLinearColor RequestedColourValue)
+    void SetCycleColourRequest(bool AskForColourCycle)
     {
         if (RawControllerData.IsValid() &&
-            RawControllerData.IsConnected &&
-            !RawControllerData.LedColourWasUpdated &&
-            !(RawControllerData.LedColourRequest == RequestedColourValue) &&
-            RequestedColourValue != FLinearColor::Transparent)
+            RawControllerData.IsConnected)
         {
-            RawControllerData.LedColourRequest = RequestedColourValue;
-            RawControllerData.UpdateLedRequest = true;
+            RawControllerData.CycleColourRequest = AskForColourCycle;
         }
-        else {
-            RawControllerData.UpdateLedRequest = false;
+        else
+        {
+            RawControllerData.CycleColourRequest = false;
         }
     }
 
     void SetResetPoseRequest(bool AskForPoseReset)
     {
         if (RawControllerData.IsValid() &&
-            RawControllerData.IsConnected &&
-            !(RawControllerData.ResetPoseRequest == AskForPoseReset) &&
-            !RawControllerData.PoseWasReset)
+            RawControllerData.IsConnected)
         {
             RawControllerData.ResetPoseRequest = AskForPoseReset;
         }

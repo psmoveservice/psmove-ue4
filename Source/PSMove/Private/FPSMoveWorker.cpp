@@ -1,10 +1,6 @@
-//
-//  FPSMoveWorker.cpp
-//  TestPSMove
-//
 //  Created by Chadwick Boulay on 2015-02-20.
-//  Copyright (c) 2015 EpicGames. All rights reserved.
-//
+//  chadwick.boulay _at_ gmail.com
+//  Many contributions by Brendan Walker brendan _at_ polyarcgames.com
 
 // -- includes ----
 #include "PSMovePrivatePCH.h"
@@ -17,6 +13,9 @@
 static const float CONTROLLER_COUNT_POLL_INTERVAL = 1000.f; // milliseconds
 
 // -- private definitions ----
+
+// TrackingContext contains references to the psmoveapi tracker and fusion objects, the controllers,
+// and references to the shared (controller independent) data and the controller(s) data.
 struct TrackingContext
 {
     FPSMoveRawSharedData_TLS *WorkerSharedData;
@@ -31,6 +30,7 @@ struct TrackingContext
     
     PSMoveFusion *PSMoveFusion;
     
+    // Constructor
     TrackingContext(FPSMoveRawSharedData_TLS *sharedData,
                     FPSMoveRawControllerWorkerData_TLS *controllerDataArray) :
         WorkerSharedData(sharedData),
@@ -51,28 +51,29 @@ struct TrackingContext
         TrackerHeight = 0;
         PSMoveFusion = NULL;
         
-        // Make sure all of the calibration state is reset
+        // Make sure all of the controller-independent state is reset
         WorkerSharedData->Reset();
     }
 };
 
 // -- prototypes ----
-static bool TrackingContextSetup(TrackingContext *context);
-static bool TrackingContextIsSetup(TrackingContext *context);
-static bool TrackingContextUpdateControllerConnections(TrackingContext *context);
-static void TrackingContextTeardown(TrackingContext *context);
-static void ControllerUpdatePositions(PSMoveTracker *psmove_tracker,
+static bool TrackingContextSetup(TrackingContext *context);                                 //
+static bool TrackingContextIsSetup(TrackingContext *context);                               //
+static bool TrackingContextUpdateControllerConnections(TrackingContext *context);           // Add or remove PSMove controllers.
+static void TrackingContextTeardown(TrackingContext *context);                              //
+static void ControllerUpdatePositions(PSMoveTracker *psmove_tracker,                        // 
                                       PSMoveFusion *psmove_fusion,
                                       PSMove *psmove,
                                       FPSMoveRawControllerData_Base *controllerData);
-static void ControllerUpdateOrientations(PSMove *psmove,
+static void ControllerUpdateOrientations(PSMove *psmove,                                    //
                                          FPSMoveRawControllerData_Base *controllerData);
-static void ControllerUpdateButtonState(PSMove *psmove,
+static void ControllerUpdateButtonState(PSMove *psmove,                                     //
                                         FPSMoveRawControllerData_Base *controllerData);
 
 // -- Worker Thread --
 FPSMoveWorker* FPSMoveWorker::WorkerInstance = NULL;
 
+// The worker spawns the thread that communicates with the PSMoveAPI in parallel to the game thread.
 FPSMoveWorker::FPSMoveWorker() :
     AcquiredContextCounter(0),
     StopTaskCounter(0),
@@ -184,7 +185,7 @@ uint32 FPSMoveWorker::Run()
             QUICK_SCOPE_CYCLE_COUNTER(Stat_FPSMoveWorker_RunLoop)
             
             //--------------
-            // Read the published data from the components
+            // Read the published data from the components. Currently this does nothing.
             //--------------
             WorkerSharedData.WorkerRead();
             
@@ -235,19 +236,18 @@ uint32 FPSMoveWorker::Run()
                         
                         // Store the button state
                         ControllerUpdateButtonState(Context.PSMoves[psmove_id], &localControllerData);
-                        
-                        // Publish the worker data to the component
-                        localControllerData.WorkerPost();
-                        // Read back the published data from the component
+
+                        // Now read in requested changes from Component. e.g., RumbleRequest, ResetPoseRequest, CycleColourRequest
                         localControllerData.WorkerRead();
                         
                         // Set the controller rumble (uint8; 0-255)
                         psmove_set_rumble(Context.PSMoves[psmove_id], localControllerData.RumbleRequest);
                         
-                        // See if the reset orientation request has been posted by the component
+                        // See if the reset pose request has been posted by the component.
+                        // It is not recommended to use this. We will soon expose a psmove_reset_yaw function that should be used instead.
                         if (localControllerData.ResetPoseRequest)
                         {
-                            UE_LOG(LogPSMove, Log, TEXT("FPSMoveWorker:: RESET ORIENTATION"));
+                            UE_LOG(LogPSMove, Log, TEXT("FPSMoveWorker:: RESET POSE"));
                             
                             psmove_reset_orientation(Context.PSMoves[psmove_id]);
                             psmove_tracker_reset_location(Context.PSMoveTracker, Context.PSMoves[psmove_id]);
@@ -255,35 +255,21 @@ uint32 FPSMoveWorker::Run()
                             // Clear the request flag now that we've handled the request
                             localControllerData.ResetPoseRequest = false;
                         }
-                        
-                        // See if an LED change has been posted by the component.
-                        if (localControllerData.UpdateLedRequest)
+
+                        if (localControllerData.CycleColourRequest)
                         {
-                            // TODO: Change the following to use the tracker context.
-                            /*
-                             psmove_tracker_disable(Context.PSMoveTracker, psmove);
-                             psmove_tracker_set_dimming(Context.PSMoves[psmove_id], 0.0);  // Set dimming to 0 to trigger blinking calibration.
-                             psmove_set_leds(Context.PSMoves[psmove_id], 0, 0, 0);         // Turn off the LED to make sure it isn't trackable until new colour set.
-                             psmove_update_leds(Context.PSMoves[psmove_id]);
-                             FColor newFColor = localControllerData.LedColourRequest;
-                             
-                             if (psmove_tracker_enable_with_color(Context.PSMoveTracker, Context.PSMoves[psmove_id], newFColor.R, newFColor.G, newFColor.B) == Tracker_CALIBRATED)
-                             {
-                                localControllerData.something = something.
-                             }
-                             else
-                             {
-                                UE_LOG(LogPSMove, Error, TEXT("Failed to change tracking color for PSMove controller %d"), i);
-                             }
-                             
-                             localControllerData.UpdateLedRequest = false;
-                             */
+                            UE_LOG(LogPSMove, Log, TEXT("FPSMoveWorker:: CYCLE COLOUR"));
+                            localControllerData.CycleColourRequest = false;
                         }
+
+                        // Publish the worker data to the component. e.g., Position, Orientation, Buttons
+                        // This also publishes updated ResetPoseRequest and CycleColourRequest.
+                        localControllerData.WorkerPost();
                     }
                 }
             }
             
-            // Update the position
+            // Update the clock. This is left in here from old code in case we need a clock in the future (e.g., prediction)
             {
                 QUICK_SCOPE_CYCLE_COUNTER(Stat_FPSMoveWorker_Filtering)
                 
@@ -298,7 +284,7 @@ uint32 FPSMoveWorker::Run()
             }
             
             //--------------
-            // Publish the worker data to the component
+            // Publish the shared (controller independent) worker data to the component. Currently this does nothing.
             //--------------
             WorkerSharedData.WorkerPost();
         }
@@ -456,8 +442,7 @@ static bool TrackingContextUpdateControllerConnections(TrackingContext *context)
                         assert(psmove_has_orientation(context->PSMoves[psmove_id]));
                         
                         // Don't apply any transform to the sensor data,
-                        // We'll handle that in the PSMoveComponent depending 
-                        // on whether we're using HMD Correction or not.
+                        // We'll handle that in the PSMoveComponent.
                         psmove_set_sensor_data_transform(context->PSMoves[psmove_id], k_psmove_sensor_transform_identity);
 
                         context->WorkerControllerDataArray[psmove_id].IsConnected = true;
@@ -472,11 +457,9 @@ static bool TrackingContextUpdateControllerConnections(TrackingContext *context)
                 if (context->PSMoves[psmove_id] != NULL && context->WorkerControllerDataArray[psmove_id].IsEnabled == false)
                 {
                     // The controller is connected, but not tracking yet
+                    // Enable tracking for this controller with next available colour.
                     if (psmove_tracker_enable(context->PSMoveTracker, context->PSMoves[psmove_id]) == Tracker_CALIBRATED)
                     {
-                        //TODO: psmove_tracker_enable_with_color(psmove_tracker, psmoves[i], r, g, b)
-                        //TODO: psmove_tracker_get_color(psmove_tracker, psmoves[i], unisgned char &r, &g, &b);
-                        
                         context->WorkerControllerDataArray[psmove_id].Clock.Initialize();
                         context->WorkerControllerDataArray[psmove_id].IsEnabled = true;
                     }

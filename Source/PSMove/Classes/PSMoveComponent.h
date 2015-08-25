@@ -34,17 +34,14 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = PSMove)
     uint8 RumbleRequest;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = PSMove)
-    FLinearColor LedRequest;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = PSMove)
-    bool ResetPoseRequest;
+    UFUNCTION(BlueprintCallable, Category = PSMove)
+    void ResetPose();
 
     UFUNCTION(BlueprintCallable, Category = PSMove)
     void ResetYaw();
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = PSMove)
-    bool UseHMDCorrection;
+    UFUNCTION(BlueprintCallable, Category = PSMove)
+    void CycleColours();
 
     // Delegate triggered once per frame update
     UPROPERTY(BlueprintAssignable, Category = PSMove)

@@ -5,7 +5,6 @@
 
 UPSMoveComponent::UPSMoveComponent(const FObjectInitializer &init) :
     PSMoveID(0),
-    UseHMDCorrection(true),
     ZeroYaw(FQuat::Identity)
 {
     bWantsInitializeComponent = true;
@@ -44,14 +43,12 @@ void UPSMoveComponent::TickComponent( float DeltaTime, ELevelTick TickType, FAct
 
     if (FPSMove::IsAvailable() && this->DataContext.PSMoveID != -1)
     {
-        // Post component driven requests
-        DataContext.SetRumbleRequest(this->RumbleRequest);
-        DataContext.SetLedColourRequest(this->LedRequest);
-        DataContext.SetResetPoseRequest(this->ResetPoseRequest);
+        // Read the worker thread data the component cares about.
+        DataContext.ComponentRead();
 
-        // Post the above data to the worker thread
-        // and read the worker thread data the component cares about.
-        DataContext.ComponentPostAndRead();
+        // Post component driven requests to the worker thread.
+        DataContext.SetRumbleRequest(this->RumbleRequest);
+        DataContext.ComponentPost();
 
         // Get the raw PSMove position and quaternion
         FVector PSMPos = DataContext.GetPosition();
@@ -63,7 +60,7 @@ void UPSMoveComponent::TickComponent( float DeltaTime, ELevelTick TickType, FAct
         These depend on whether or not an HMD is being used.
         */
 
-        if (UseHMDCorrection && GEngine->HMDDevice.IsValid())
+        if (GEngine->HMDDevice.IsValid())
         {
             /*
             If an HMD is present and enabled, then assume that the PSMove coordinates
@@ -150,7 +147,7 @@ void UPSMoveComponent::TickComponent( float DeltaTime, ELevelTick TickType, FAct
         */
 
         FQuat DeltaControlOrientation = CameraManagerTransform.GetRotation();
-        if (UseHMDCorrection && GEngine->HMDDevice.IsValid() && GEngine->IsStereoscopic3D())
+        if (GEngine->HMDDevice.IsValid() && GEngine->IsStereoscopic3D())
         {
             // If using an HMD, it is necessary to undo the transformation done to the camera by the HMD.
             // See here: https://github.com/EpicGames/UnrealEngine/blob/master/Engine/Plugins/Runtime/GearVR/Source/GearVR/Private/HeadMountedDisplayCommon.cpp#L989
@@ -197,4 +194,16 @@ void UPSMoveComponent::ResetYaw()
     ZeroYaw.Y = 0;
     ZeroYaw.Normalize();
     ZeroYaw = ZeroYaw.Inverse();
+}
+
+void UPSMoveComponent::ResetPose()
+{
+    DataContext.SetResetPoseRequest(true);
+    DataContext.ComponentPost();
+}
+
+void UPSMoveComponent::CycleColours()
+{
+    DataContext.SetCycleColourRequest(true);
+    DataContext.ComponentPost();
 }
