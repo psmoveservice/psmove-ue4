@@ -472,6 +472,19 @@ ADDCALL psmove_tracker_set_camera_color(PSMoveTracker *tracker, PSMove *move,
         unsigned char r, unsigned char g, unsigned char b);
 
 /**
+ * \brief Set the sphere color to the next colour in the list of default colours.
+ *
+ * \param tracker A valid \ref PSMoveTracker handle
+ * \param move A valid \ref PSMove handle
+ *
+ * \return Nonzero if the color was successfully cycled, zero if
+ *         if the controller is not enabled or calibration has not
+ *         completed yet.
+ **/
+ADDAPI int
+ADDCALL psmove_tracker_cycle_color(PSMoveTracker *tracker, PSMove *move);
+
+/**
  * \brief Query the tracking status of a motion controller
  *
  * This function returns the current tracking status (or calibration

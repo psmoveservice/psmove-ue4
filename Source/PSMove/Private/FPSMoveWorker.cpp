@@ -245,6 +245,7 @@ uint32 FPSMoveWorker::Run()
                         
                         // See if the reset pose request has been posted by the component.
                         // It is not recommended to use this. We will soon expose a psmove_reset_yaw function that should be used instead.
+                        // Until then, use the local yaw reset in the psmove component.
                         if (localControllerData.ResetPoseRequest)
                         {
                             UE_LOG(LogPSMove, Log, TEXT("FPSMoveWorker:: RESET POSE"));
@@ -259,6 +260,7 @@ uint32 FPSMoveWorker::Run()
                         if (localControllerData.CycleColourRequest)
                         {
                             UE_LOG(LogPSMove, Log, TEXT("FPSMoveWorker:: CYCLE COLOUR"));
+                            psmove_tracker_cycle_color(Context.PSMoveTracker, Context.PSMoves[psmove_id]);
                             localControllerData.CycleColourRequest = false;
                         }
 
