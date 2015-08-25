@@ -29,7 +29,7 @@ public:
     int32 PSMoveID;
  
     UPROPERTY()
-	FPSMoveDataContext DataContext;
+    FPSMoveDataContext DataContext;
     
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = PSMove)
     uint8 RumbleRequest;

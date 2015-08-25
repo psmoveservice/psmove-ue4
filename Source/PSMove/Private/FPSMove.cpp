@@ -25,15 +25,15 @@ void FPSMove::ShutdownModule()
 
 bool FPSMove::AcquirePSMove(int32 PSMoveID, FPSMoveDataContext *DataContext)
 {
-	bool success = false;
-	FPSMoveWorker* WorkerSingleton = FPSMoveWorker::GetSingletonInstance();
+    bool success = false;
+    FPSMoveWorker* WorkerSingleton = FPSMoveWorker::GetSingletonInstance();
 
-	if (WorkerSingleton != NULL)
-	{
-		success = WorkerSingleton->AcquirePSMove(PSMoveID, DataContext);
-	}
+    if (WorkerSingleton != NULL)
+    {
+        success = WorkerSingleton->AcquirePSMove(PSMoveID, DataContext);
+    }
 
-	return success;
+    return success;
 }
 
 void FPSMove::ReleasePSMove(FPSMoveDataContext *DataContext)

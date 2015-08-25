@@ -22,11 +22,11 @@ void UPSMoveComponent::BeginPlay()
     {
         this->DataContext.Clear();
 
-		// Bind the data context to the concurrent controller data in the worker thread
-		if (!FPSMove::Get().AcquirePSMove(this->PSMoveID, &this->DataContext))
-		{
-			UE_LOG(LogPSMove, Error, TEXT("Failed to acquire PSMove controller %d"), this->PSMoveID);
-		}
+        // Bind the data context to the concurrent controller data in the worker thread
+        if (!FPSMove::Get().AcquirePSMove(this->PSMoveID, &this->DataContext))
+        {
+            UE_LOG(LogPSMove, Error, TEXT("Failed to acquire PSMove controller %d"), this->PSMoveID);
+        }
     }
 }
 
@@ -46,19 +46,19 @@ void UPSMoveComponent::TickComponent( float DeltaTime, ELevelTick TickType, FAct
 
     if (FPSMove::IsAvailable() && this->DataContext.PSMoveID != -1)
     {
-		// Post component driven requests
+        // Post component driven requests
         DataContext.SetRumbleRequest(this->RumbleRequest);
-		DataContext.SetLedColourRequest(this->LedRequest);
-		DataContext.SetResetPoseRequest(this->ResetPoseRequest);
+        DataContext.SetLedColourRequest(this->LedRequest);
+        DataContext.SetResetPoseRequest(this->ResetPoseRequest);
 
-		// Post the above data to the worker thread
-		// and read the worker thread data the component cares about.
-		DataContext.ComponentPostAndRead();
+        // Post the above data to the worker thread
+        // and read the worker thread data the component cares about.
+        DataContext.ComponentPostAndRead();
 
         // Get the raw PSMove position and quaternion
-		FVector PSMPos = DataContext.GetPosition();
-		FQuat PSMOri = DataContext.GetOrientation();
-		bool PSMIsTracked = DataContext.GetIsTracking();
+        FVector PSMPos = DataContext.GetPosition();
+        FQuat PSMOri = DataContext.GetOrientation();
+        bool PSMIsTracked = DataContext.GetIsTracking();
 
         /*
         There are several steps needed to go from the PSMove reference frame to the game world reference frame.
@@ -173,15 +173,15 @@ void UPSMoveComponent::TickComponent( float DeltaTime, ELevelTick TickType, FAct
 
         // Fire off the events
         OnDataUpdated.Broadcast(PSMPos, PSMOri.Rotator(), PSMIsTracked);
-		OnTriangleButton.Broadcast(DataContext.GetButtonTriangle());
-		OnCircleButton.Broadcast(DataContext.GetButtonCircle());
-		OnCrossButton.Broadcast(DataContext.GetButtonCross());
-		OnSquareButton.Broadcast(DataContext.GetButtonSquare());
-		OnSelectButton.Broadcast(DataContext.GetButtonSelect());
-		OnStartButton.Broadcast(DataContext.GetButtonStart());
-		OnPSButton.Broadcast(DataContext.GetButtonPS());
-		OnMoveButton.Broadcast(DataContext.GetButtonMove());
-		OnTriggerButton.Broadcast(DataContext.GetTriggerValue());
+        OnTriangleButton.Broadcast(DataContext.GetButtonTriangle());
+        OnCircleButton.Broadcast(DataContext.GetButtonCircle());
+        OnCrossButton.Broadcast(DataContext.GetButtonCross());
+        OnSquareButton.Broadcast(DataContext.GetButtonSquare());
+        OnSelectButton.Broadcast(DataContext.GetButtonSelect());
+        OnStartButton.Broadcast(DataContext.GetButtonStart());
+        OnPSButton.Broadcast(DataContext.GetButtonPS());
+        OnMoveButton.Broadcast(DataContext.GetButtonMove());
+        OnTriggerButton.Broadcast(DataContext.GetTriggerValue());
     }
 }
 

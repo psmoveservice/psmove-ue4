@@ -150,7 +150,7 @@ struct FPSMoveRawControllerData_Base
     GENERATED_USTRUCT_BODY();
     
     // -------
-	// Data items that typically get filled by the Worker thread
+    // Data items that typically get filled by the Worker thread
     // then are made available to the consuming game object (i.e. component)
     
     UPROPERTY()
@@ -171,10 +171,10 @@ struct FPSMoveRawControllerData_Base
     UPROPERTY()
     uint8 TriggerValue;
 
-	UPROPERTY()
+    UPROPERTY()
     bool IsConnected;           // Whether or not the controller is connected
 
-	UPROPERTY()
+    UPROPERTY()
     bool IsTracking;            // Whether or not the tracker saw the controller on the latest frame.
     
     UPROPERTY()
@@ -187,12 +187,12 @@ struct FPSMoveRawControllerData_Base
     bool PoseWasReset;          // true if the pose was reset
 
     // -------
-	// Data items that typically get filled by the game object (i.e., PSMoveComponent)
+    // Data items that typically get filled by the game object (i.e., PSMoveComponent)
     // then are passed to the worker thread.
     
     bool UpdateLedRequest;          // Please update the LEDs
 
-	UPROPERTY()
+    UPROPERTY()
     uint8 RumbleRequest;            // Please make the controller rumbled
 
     UPROPERTY()
@@ -202,13 +202,13 @@ struct FPSMoveRawControllerData_Base
     bool ResetPoseRequest;          // Please use the current pose as zero-pose.
     
     // Constructor
-	FPSMoveRawControllerData_Base()
-	{
-		Clear();
-	}
+    FPSMoveRawControllerData_Base()
+    {
+        Clear();
+    }
 
-	void Clear()
-	{
+    void Clear()
+    {
         PSMovePosition = FVector::ZeroVector;
         PSMoveOrientation = FQuat::Identity;
         Buttons = 0;
@@ -222,7 +222,7 @@ struct FPSMoveRawControllerData_Base
         ResetPoseRequest = false;
         PoseWasReset = false;
         IsConnected = false;
-		IsCalibrated = false;
+        IsCalibrated = false;
         IsTracking = false;
         IsEnabled = false;
     }
@@ -232,21 +232,21 @@ struct FPSMoveRawControllerData_Base
 USTRUCT()
 struct FPSMoveRawControllerData_Concurrent : public FPSMoveRawControllerData_Base
 {
-	GENERATED_USTRUCT_BODY();
+    GENERATED_USTRUCT_BODY();
 
-	// Used to make sure we're accessing the data in a thread safe way
-	FCriticalSection Lock;
+    // Used to make sure we're accessing the data in a thread safe way
+    FCriticalSection Lock;
 
-	FPSMoveRawControllerData_Concurrent() :
-		Lock()
-	{
-		Clear();
-	}
+    FPSMoveRawControllerData_Concurrent() :
+        Lock()
+    {
+        Clear();
+    }
 
-	inline void Clear()
-	{
-		FPSMoveRawControllerData_Base::Clear();
-	}
+    inline void Clear()
+    {
+        FPSMoveRawControllerData_Base::Clear();
+    }
 };
 
 // A version of the data frame that will be used by the controller.
@@ -255,29 +255,29 @@ struct FPSMoveRawControllerData_Concurrent : public FPSMoveRawControllerData_Bas
 USTRUCT()
 struct FPSMoveRawControllerData_TLS : public FPSMoveRawControllerData_Base
 {
-	GENERATED_USTRUCT_BODY();
+    GENERATED_USTRUCT_BODY();
 
-	// This is a pointer to a copy of the data that wil
-	FPSMoveRawControllerData_Concurrent *ConcurrentData;
+    // This is a pointer to a copy of the data that wil
+    FPSMoveRawControllerData_Concurrent *ConcurrentData;
 
-	FPSMoveRawControllerData_TLS()
-	{
-		Clear();
-	}
+    FPSMoveRawControllerData_TLS()
+    {
+        Clear();
+    }
 
-	void Clear()
-	{
-		FPSMoveRawControllerData_Base::Clear();
-		ConcurrentData = nullptr;
-	}
+    void Clear()
+    {
+        FPSMoveRawControllerData_Base::Clear();
+        ConcurrentData = nullptr;
+    }
 
-	bool IsValid() const
-	{
-		return ConcurrentData != nullptr;
-	}
+    bool IsValid() const
+    {
+        return ConcurrentData != nullptr;
+    }
 
-	void ComponentPostAndRead()
-	{
+    void ComponentPostAndRead()
+    {
         FPSMoveHitchWatchdog watchdog(TEXT("FPSMoveRawControllerData_TLS::ComponentPostAndRead"), 500);
         {
             FScopeLock scopeLock(&ConcurrentData->Lock);
@@ -302,37 +302,37 @@ struct FPSMoveRawControllerData_TLS : public FPSMoveRawControllerData_Base
             this->LedColourWasUpdated = ConcurrentData->LedColourWasUpdated;
             this->PoseWasReset = ConcurrentData->PoseWasReset;
         }
-	}
+    }
 
-	void WorkerRead()
-	{
-		FScopeLock scopeLock(&ConcurrentData->Lock);
+    void WorkerRead()
+    {
+        FScopeLock scopeLock(&ConcurrentData->Lock);
 
-		// Read the component thread's data into the worker thread's data
-		this->RumbleRequest = ConcurrentData->RumbleRequest;
-		this->LedColourRequest = ConcurrentData->LedColourRequest;
-		this->ResetPoseRequest = ConcurrentData->ResetPoseRequest;
-		this->UpdateLedRequest = ConcurrentData->UpdateLedRequest;
-	}
+        // Read the component thread's data into the worker thread's data
+        this->RumbleRequest = ConcurrentData->RumbleRequest;
+        this->LedColourRequest = ConcurrentData->LedColourRequest;
+        this->ResetPoseRequest = ConcurrentData->ResetPoseRequest;
+        this->UpdateLedRequest = ConcurrentData->UpdateLedRequest;
+    }
 
-	void WorkerPost()
-	{
-		FScopeLock scopeLock(&ConcurrentData->Lock);
+    void WorkerPost()
+    {
+        FScopeLock scopeLock(&ConcurrentData->Lock);
 
-		// Post the worker thread's data to the component thread's data
+        // Post the worker thread's data to the component thread's data
         ConcurrentData->PSMovePosition = this->PSMovePosition;
         ConcurrentData->PSMoveOrientation = this->PSMoveOrientation;
-		ConcurrentData->Buttons = this->Buttons;
-		ConcurrentData->Pressed = this->Pressed;
-		ConcurrentData->Released = this->Released;
-		ConcurrentData->TriggerValue = this->TriggerValue;
-		ConcurrentData->IsConnected = this->IsConnected;
-		ConcurrentData->IsCalibrated = this->IsCalibrated;
-		ConcurrentData->IsTracking = this->IsTracking;
+        ConcurrentData->Buttons = this->Buttons;
+        ConcurrentData->Pressed = this->Pressed;
+        ConcurrentData->Released = this->Released;
+        ConcurrentData->TriggerValue = this->TriggerValue;
+        ConcurrentData->IsConnected = this->IsConnected;
+        ConcurrentData->IsCalibrated = this->IsCalibrated;
+        ConcurrentData->IsTracking = this->IsTracking;
         ConcurrentData->IsEnabled = this->IsEnabled;
-		ConcurrentData->LedColourWasUpdated = this->LedColourWasUpdated;
-		ConcurrentData->PoseWasReset = this->PoseWasReset;
-	}
+        ConcurrentData->LedColourWasUpdated = this->LedColourWasUpdated;
+        ConcurrentData->PoseWasReset = this->PoseWasReset;
+    }
 };
 
 USTRUCT()
@@ -344,25 +344,25 @@ struct FPSMoveDataContext
     int32 PSMoveID;
     
     FPSMoveRawSharedData_TLS RawSharedData;
-	FPSMoveRawControllerData_TLS RawControllerData;
+    FPSMoveRawControllerData_TLS RawControllerData;
     
-	void ComponentPostAndRead()
-	{
+    void ComponentPostAndRead()
+    {
         if (RawSharedData.IsValid())
         {
             RawSharedData.ComponentPostAndRead();
         }
         
-		if (RawControllerData.IsValid())
-		{
-			RawControllerData.ComponentPostAndRead();
-		}
-	}
+        if (RawControllerData.IsValid())
+        {
+            RawControllerData.ComponentPostAndRead();
+        }
+    }
 
-	// Controller Data Functions
+    // Controller Data Functions
     FVector GetPosition()
     {
-		if (RawControllerData.IsValid() && RawControllerData.IsConnected)
+        if (RawControllerData.IsValid() && RawControllerData.IsConnected)
         {
             return RawControllerData.PSMovePosition;
         } else {
@@ -372,7 +372,7 @@ struct FPSMoveDataContext
 
     FQuat GetOrientation()
     {
-		if (RawControllerData.IsValid() && RawControllerData.IsConnected)
+        if (RawControllerData.IsValid() && RawControllerData.IsConnected)
         {
             return RawControllerData.PSMoveOrientation;
         }
@@ -388,9 +388,9 @@ struct FPSMoveDataContext
 
     bool GetIsTracking()
     {
-		if (RawControllerData.IsValid() && RawControllerData.IsConnected)
+        if (RawControllerData.IsValid() && RawControllerData.IsConnected)
         {
-			return RawControllerData.IsTracking;
+            return RawControllerData.IsTracking;
         }
         else {
             return false;
@@ -410,9 +410,9 @@ struct FPSMoveDataContext
     
     bool GetButtonTriangle()
     {
-		if (RawControllerData.IsValid() && RawControllerData.IsConnected)
+        if (RawControllerData.IsValid() && RawControllerData.IsConnected)
         {
-			return (RawControllerData.Buttons & PSMove_Button::Btn_TRIANGLE) != 0;
+            return (RawControllerData.Buttons & PSMove_Button::Btn_TRIANGLE) != 0;
         } else {
             return 0;
         }
@@ -420,9 +420,9 @@ struct FPSMoveDataContext
     
     bool GetButtonCircle()
     {
-		if (RawControllerData.IsValid() && RawControllerData.IsConnected)
+        if (RawControllerData.IsValid() && RawControllerData.IsConnected)
         {
-			return (RawControllerData.Buttons & PSMove_Button::Btn_CIRCLE) != 0;
+            return (RawControllerData.Buttons & PSMove_Button::Btn_CIRCLE) != 0;
         } else {
             return 0;
         }
@@ -430,9 +430,9 @@ struct FPSMoveDataContext
     
     bool GetButtonCross()
     {
-		if (RawControllerData.IsValid() && RawControllerData.IsConnected)
+        if (RawControllerData.IsValid() && RawControllerData.IsConnected)
         {
-			return (RawControllerData.Buttons & PSMove_Button::Btn_CROSS) != 0;
+            return (RawControllerData.Buttons & PSMove_Button::Btn_CROSS) != 0;
         } else {
             return 0;
         }
@@ -440,9 +440,9 @@ struct FPSMoveDataContext
     
     bool GetButtonSquare()
     {
-		if (RawControllerData.IsValid() && RawControllerData.IsConnected)
+        if (RawControllerData.IsValid() && RawControllerData.IsConnected)
         {
-			return (RawControllerData.Buttons & PSMove_Button::Btn_SQUARE) != 0;
+            return (RawControllerData.Buttons & PSMove_Button::Btn_SQUARE) != 0;
         } else {
             return 0;
         }
@@ -450,9 +450,9 @@ struct FPSMoveDataContext
     
     bool GetButtonSelect()
     {
-		if (RawControllerData.IsValid() && RawControllerData.IsConnected)
+        if (RawControllerData.IsValid() && RawControllerData.IsConnected)
         {
-			return (RawControllerData.Buttons & PSMove_Button::Btn_SELECT) != 0;
+            return (RawControllerData.Buttons & PSMove_Button::Btn_SELECT) != 0;
         } else {
             return 0;
         }
@@ -460,9 +460,9 @@ struct FPSMoveDataContext
     
     bool GetButtonStart()
     {
-		if (RawControllerData.IsValid() && RawControllerData.IsConnected)
+        if (RawControllerData.IsValid() && RawControllerData.IsConnected)
         {
-			return (RawControllerData.Buttons & PSMove_Button::Btn_START) != 0;
+            return (RawControllerData.Buttons & PSMove_Button::Btn_START) != 0;
         } else {
             return 0;
         }
@@ -470,9 +470,9 @@ struct FPSMoveDataContext
     
     bool GetButtonPS()
     {
-		if (RawControllerData.IsValid() && RawControllerData.IsConnected)
+        if (RawControllerData.IsValid() && RawControllerData.IsConnected)
         {
-			return (RawControllerData.Buttons & PSMove_Button::Btn_PS) != 0;
+            return (RawControllerData.Buttons & PSMove_Button::Btn_PS) != 0;
         } else {
             return 0;
         }
@@ -480,9 +480,9 @@ struct FPSMoveDataContext
     
     bool GetButtonMove()
     {
-		if (RawControllerData.IsValid() && RawControllerData.IsConnected)
+        if (RawControllerData.IsValid() && RawControllerData.IsConnected)
         {
-			return (RawControllerData.Buttons & PSMove_Button::Btn_MOVE) != 0;
+            return (RawControllerData.Buttons & PSMove_Button::Btn_MOVE) != 0;
         } else {
             return 0;
         }
@@ -490,9 +490,9 @@ struct FPSMoveDataContext
     
     uint8 GetTriggerValue()
     {
-		if (RawControllerData.IsValid() && RawControllerData.IsConnected)
+        if (RawControllerData.IsValid() && RawControllerData.IsConnected)
         {
-			return RawControllerData.TriggerValue;
+            return RawControllerData.TriggerValue;
         } else {
             return 0;
         }
@@ -500,57 +500,57 @@ struct FPSMoveDataContext
     
     void SetRumbleRequest(uint8 RequestedRumbleValue)
     {
-		if (RawControllerData.IsValid() && RawControllerData.IsConnected)
+        if (RawControllerData.IsValid() && RawControllerData.IsConnected)
         {
-			RawControllerData.RumbleRequest = RequestedRumbleValue;
+            RawControllerData.RumbleRequest = RequestedRumbleValue;
         }
     }
 
     void SetLedColourRequest(FLinearColor RequestedColourValue)
     {
-		if (RawControllerData.IsValid() &&
-			RawControllerData.IsConnected &&
-			!RawControllerData.LedColourWasUpdated &&
-			!(RawControllerData.LedColourRequest == RequestedColourValue) &&
-			RequestedColourValue != FLinearColor::Transparent)
+        if (RawControllerData.IsValid() &&
+            RawControllerData.IsConnected &&
+            !RawControllerData.LedColourWasUpdated &&
+            !(RawControllerData.LedColourRequest == RequestedColourValue) &&
+            RequestedColourValue != FLinearColor::Transparent)
         {
             RawControllerData.LedColourRequest = RequestedColourValue;
             RawControllerData.UpdateLedRequest = true;
         }
         else {
-			RawControllerData.UpdateLedRequest = false;
+            RawControllerData.UpdateLedRequest = false;
         }
     }
 
     void SetResetPoseRequest(bool AskForPoseReset)
     {
-		if (RawControllerData.IsValid() &&
-			RawControllerData.IsConnected &&
-			!(RawControllerData.ResetPoseRequest == AskForPoseReset) &&
-			!RawControllerData.PoseWasReset)
+        if (RawControllerData.IsValid() &&
+            RawControllerData.IsConnected &&
+            !(RawControllerData.ResetPoseRequest == AskForPoseReset) &&
+            !RawControllerData.PoseWasReset)
         {
-			RawControllerData.ResetPoseRequest = AskForPoseReset;
+            RawControllerData.ResetPoseRequest = AskForPoseReset;
         }
         else {
-			RawControllerData.ResetPoseRequest = false;
+            RawControllerData.ResetPoseRequest = false;
         }
     }
 
-	FPSMoveDataContext()
-	{
-		Clear();
-	}
+    FPSMoveDataContext()
+    {
+        Clear();
+    }
 
-	void Clear()
-	{
-		PSMoveID = -1;
-		RawControllerData.ConcurrentData = nullptr;
+    void Clear()
+    {
+        PSMoveID = -1;
+        RawControllerData.ConcurrentData = nullptr;
         RawSharedData.ConcurrentData = nullptr;
-	}    
+    }    
 };
 
 UCLASS()
 class UPSMoveTypes : public UObject
 {
-	GENERATED_BODY()
+    GENERATED_BODY()
 };

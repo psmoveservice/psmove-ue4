@@ -82,16 +82,16 @@ FPSMoveWorker::FPSMoveWorker() :
     // Bind the shared worker concurrent data to its corresponding thread-local container
     WorkerSharedData.ConcurrentData = &WorkerSharedData_Concurrent;
     
-	// Setup the controller data entries
-	for (int32 controller_index = 0; controller_index < FPSMoveWorker::k_max_controllers; ++controller_index)
-	{
-		// Make sure the controller entries are initialized
-		WorkerControllerDataArray[controller_index].Clear();
-		WorkerControllerDataArray_Concurrent[controller_index].Clear();
+    // Setup the controller data entries
+    for (int32 controller_index = 0; controller_index < FPSMoveWorker::k_max_controllers; ++controller_index)
+    {
+        // Make sure the controller entries are initialized
+        WorkerControllerDataArray[controller_index].Clear();
+        WorkerControllerDataArray_Concurrent[controller_index].Clear();
 
-		// Bind the controller worker concurrent data to its corresponding thread-local container
-		WorkerControllerDataArray[controller_index].ConcurrentData = &WorkerControllerDataArray_Concurrent[controller_index];
-	}
+        // Bind the controller worker concurrent data to its corresponding thread-local container
+        WorkerControllerDataArray[controller_index].ConcurrentData = &WorkerControllerDataArray_Concurrent[controller_index];
+    }
     
     // This Inits and Runs the thread.
     Thread = FRunnableThread::Create(this, TEXT("FPSMoveWorker"), 0, TPri_Normal);
@@ -110,32 +110,32 @@ bool FPSMoveWorker::Init()
 }
 
 bool FPSMoveWorker::AcquirePSMove(
-	int32 PSMoveID,
-	FPSMoveDataContext *DataContext)
+    int32 PSMoveID,
+    FPSMoveDataContext *DataContext)
 {
-	bool success = false;
+    bool success = false;
 
-	if (PSMoveID >= 0 && PSMoveID < FPSMoveWorker::k_max_controllers)
-	{
-		// Remember which PSMove the data context is assigned to
-		DataContext->Clear();
-		DataContext->PSMoveID = PSMoveID;
+    if (PSMoveID >= 0 && PSMoveID < FPSMoveWorker::k_max_controllers)
+    {
+        // Remember which PSMove the data context is assigned to
+        DataContext->Clear();
+        DataContext->PSMoveID = PSMoveID;
 
-		// Bind the data context to the concurrent data for the requested controller
-		// This doesn't mean  that the controller is active, just that a component
-		// is now watching this block of data.
-		// Also this is thread safe because were not actually looking at the concurrent data
-		// at this point, just assigning a pointer to the concurrent data.
+        // Bind the data context to the concurrent data for the requested controller
+        // This doesn't mean  that the controller is active, just that a component
+        // is now watching this block of data.
+        // Also this is thread safe because were not actually looking at the concurrent data
+        // at this point, just assigning a pointer to the concurrent data.
         DataContext->RawSharedData.ConcurrentData = &WorkerSharedData_Concurrent;
-		DataContext->RawControllerData.ConcurrentData = &WorkerControllerDataArray_Concurrent[PSMoveID];
+        DataContext->RawControllerData.ConcurrentData = &WorkerControllerDataArray_Concurrent[PSMoveID];
         
         // The worker thread will create a tracker if one isn't active at this moment
         AcquiredContextCounter.Increment();
 
-		success = true;
-	}
+        success = true;
+    }
 
-	return success;
+    return success;
 }
 
 void FPSMoveWorker::ReleasePSMove(FPSMoveDataContext *DataContext)
@@ -455,10 +455,10 @@ static bool TrackingContextUpdateControllerConnections(TrackingContext *context)
                         psmove_enable_orientation(context->PSMoves[psmove_id], PSMove_True);
                         assert(psmove_has_orientation(context->PSMoves[psmove_id]));
                         
-						// Don't apply any transform to the sensor data,
-						// We'll handle that in the PSMoveComponent depending 
-						// on whether we're using HMD Correction or not.
-						psmove_set_sensor_data_transform(context->PSMoves[psmove_id], k_psmove_sensor_transform_identity);
+                        // Don't apply any transform to the sensor data,
+                        // We'll handle that in the PSMoveComponent depending 
+                        // on whether we're using HMD Correction or not.
+                        psmove_set_sensor_data_transform(context->PSMoves[psmove_id], k_psmove_sensor_transform_identity);
 
                         context->WorkerControllerDataArray[psmove_id].IsConnected = true;
                     }

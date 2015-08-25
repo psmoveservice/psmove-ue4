@@ -37,12 +37,12 @@ public:
         return FModuleManager::Get().IsModuleLoaded( "PSMove" );
     }
     
-	/**
-	* Tell the PSMove module that we want to start listening to this controller.
-	*
-	* @return True if we can successfully acquire the controller.
-	*/
-	virtual bool AcquirePSMove(int32 PSMoveID, FPSMoveDataContext *DataContext);
+    /**
+    * Tell the PSMove module that we want to start listening to this controller.
+    *
+    * @return True if we can successfully acquire the controller.
+    */
+    virtual bool AcquirePSMove(int32 PSMoveID, FPSMoveDataContext *DataContext);
     
     /**
      * Tell the PSMove module that we don't care about listening to this controller anymore.
