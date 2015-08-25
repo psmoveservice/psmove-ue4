@@ -6,8 +6,6 @@
 UPSMoveComponent::UPSMoveComponent(const FObjectInitializer &init) :
     PSMoveID(0),
     UseHMDCorrection(true),
-    ViewRotation(FRotator::ZeroRotator),
-    ViewLocation(0.0),
     ZeroYaw(FQuat::Identity)
 {
     bWantsInitializeComponent = true;
@@ -62,9 +60,9 @@ void UPSMoveComponent::TickComponent( float DeltaTime, ELevelTick TickType, FAct
 
         /*
         There are several steps needed to go from the PSMove reference frame to the game world reference frame.
-        How we do this depends on whether or not the user is using a VR HMD.
+        These depend on whether or not an HMD is being used.
         */
-        
+
         if (UseHMDCorrection && GEngine->HMDDevice.IsValid())
         {
             /*
@@ -141,11 +139,17 @@ void UPSMoveComponent::TickComponent( float DeltaTime, ELevelTick TickType, FAct
             PSMPos = FVector(-PSMPos.Z, PSMPos.X, PSMPos.Y);
         }
 
+        // Get the CameraManager
+        UObject* WorldContextObject = this;
+        APlayerCameraManager* CameraManager = UGameplayStatics::GetPlayerCameraManager(WorldContextObject, this->PlayerIndex);
+        FTransform CameraManagerTransform = CameraManager->GetTransform();
+
         /*
         Now we must transform from HMD_UE4 space to world_UE4 space.
         This is done by transforming through the player camera which contains the player pose in the world.
         */
-        FQuat DeltaControlOrientation = ViewRotation.Quaternion();
+
+        FQuat DeltaControlOrientation = CameraManagerTransform.GetRotation();
         if (UseHMDCorrection && GEngine->HMDDevice.IsValid() && GEngine->IsStereoscopic3D())
         {
             // If using an HMD, it is necessary to undo the transformation done to the camera by the HMD.
@@ -164,7 +168,8 @@ void UPSMoveComponent::TickComponent( float DeltaTime, ELevelTick TickType, FAct
         // Transform the PSMove through the camera
         PSMOri = DeltaControlOrientation * PSMOri;
         PSMPos = DeltaControlOrientation.RotateVector(PSMPos);
-        PSMPos += ViewLocation;
+
+        PSMPos += CameraManagerTransform.GetLocation();
 
         LastPosition = PSMPos;
         LastOrientation = PSMOri;
