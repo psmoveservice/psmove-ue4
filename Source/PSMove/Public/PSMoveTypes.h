@@ -374,7 +374,6 @@ struct FPSMoveDataContext
     {
 		if (RawControllerData.IsValid() && RawControllerData.IsConnected)
         {
-            //return FQuat(-RawDataPtr->OriX, RawDataPtr->OriY, RawDataPtr->OriZ, -RawDataPtr->OriW);
             return RawControllerData.PSMoveOrientation;
         }
         else {

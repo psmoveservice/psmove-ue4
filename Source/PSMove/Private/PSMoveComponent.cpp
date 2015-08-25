@@ -119,8 +119,7 @@ void UPSMoveComponent::TickComponent( float DeltaTime, ELevelTick TickType, FAct
 
             // Transform PSMove pose from HMD_native in HMD_CS to HMD_native in UE4_CS
             // Currently Oculus-specific.
-            // PSMOri = FQuat(-PSMOri.Z, PSMOri.X, PSMOri.Y, -PSMOri.W);
-            PSMOri = FQuat(-PSMOri.X, PSMOri.Y, PSMOri.Z, -PSMOri.W);
+            PSMOri = FQuat(PSMOri.Y, PSMOri.X, PSMOri.Z, -PSMOri.W);
             // TODO: units m->cm unnecessary because physical_transform was kept in cm.
             PSMPos = FVector(-PSMPos.Z, PSMPos.X, PSMPos.Y);
 
@@ -138,7 +137,7 @@ void UPSMoveComponent::TickComponent( float DeltaTime, ELevelTick TickType, FAct
             If we are not using an HMD then assume that the PSMove coordinates being returned are in their native space.
             */
             // Transform from PSEye coordinate system to UE4 coordinate system
-            PSMOri = FQuat(-PSMOri.Z, PSMOri.X, PSMOri.Y, -PSMOri.W);
+            PSMOri = FQuat(PSMOri.Y, PSMOri.X, PSMOri.Z, -PSMOri.W);
             PSMPos = FVector(-PSMPos.Z, PSMPos.X, PSMPos.Y);
         }
 
