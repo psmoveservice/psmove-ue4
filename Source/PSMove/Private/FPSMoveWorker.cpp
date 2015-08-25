@@ -455,6 +455,11 @@ static bool TrackingContextUpdateControllerConnections(TrackingContext *context)
                         psmove_enable_orientation(context->PSMoves[psmove_id], PSMove_True);
                         assert(psmove_has_orientation(context->PSMoves[psmove_id]));
                         
+						// Don't apply any transform to the sensor data,
+						// We'll handle that in the PSMoveComponent depending 
+						// on whether we're using HMD Correction or not.
+						psmove_set_sensor_data_transform(context->PSMoves[psmove_id], k_psmove_sensor_transform_identity);
+
                         context->WorkerControllerDataArray[psmove_id].IsConnected = true;
                     }
                     else

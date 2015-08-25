@@ -157,15 +157,17 @@ enum PSMove_RemoteConfig {
     PSMove_OnlyRemote = 2, /*!< Use only remote (moved) devices, ignore local devices */
 };
 
+enum PSMoveOrientation_Fusion_Type {
+	OrientationFusion_None,
+	OrientationFusion_MadgwickIMU,
+	OrientationFusion_MadgwickMARG,
+	OrientationFusion_ComplementaryMARG,
+};
+
 #ifndef SWIG
 struct _PSMove;
 typedef struct _PSMove PSMove; /*!< Handle to a PS Move Controller.
                                     Obtained via psmove_connect_by_id() */
-struct _PSMoveOrientation;
-typedef struct _PSMoveOrientation PSMoveOrientation;
-
-struct _PSMove_3AxisVector;
-typedef struct _PSMove_3AxisVector PSMove_3AxisVector;
 #endif
 
 /*! Size of buffer for holding the extension device's data as reported by the Move */
@@ -180,6 +182,36 @@ typedef struct {
     unsigned char dev_info[38];
 } PSMove_Ext_Device_Info;
 
+/* A 3d vector - methods in math/psmove_vector.h */
+struct _PSMove_3AxisVector
+{
+	union {
+		struct
+		{
+			float x;
+			float y;
+			float z;
+		};
+		float v[3];
+	};
+};
+typedef struct _PSMove_3AxisVector PSMove_3AxisVector;
+
+/* A 3x3 transform matrix - methods in math/psmove_vector.h */
+struct _PSMove_3AxisTransform
+{
+	union {
+		struct
+		{
+			float row0[3];
+			float row1[3];
+			float row2[3];
+		};
+		float m[9];
+	};
+};
+typedef struct _PSMove_3AxisTransform PSMove_3AxisTransform;
+
 /*! Library version number */
 enum PSMove_Version {
     /**
@@ -191,6 +223,14 @@ enum PSMove_Version {
      **/
     PSMOVE_CURRENT_VERSION = 0x030001, /*!< Current version, see psmove_init() */
 };
+
+/*! Transforms used by psmove_set_orientation_calibration_transform */
+ADDAPI extern const PSMove_3AxisTransform *k_psmove_identity_pose_upright;
+ADDAPI extern const PSMove_3AxisTransform *k_psmove_identity_pose_laying_flat;
+
+/*! Transforms used by psmove_set_orientation_sensor_data_transform */
+ADDAPI extern const PSMove_3AxisTransform *k_psmove_sensor_transform_identity;
+ADDAPI extern const PSMove_3AxisTransform *k_psmove_sensor_transform_opengl;
 
 /**
  * \brief Initialize the library and check for the right version
@@ -954,10 +994,47 @@ ADDCALL psmove_get_magnetometer_vector(PSMove *move, float *mx, float *my, float
  * controller.
  *
  * \param move A valid \ref PSMove handle
- * \param m Pointer to \ref PSMove_3AxisVector 
+ * \param out_m The output \ref PSMove_3AxisVector
  **/
 ADDAPI void
 ADDCALL psmove_get_magnetometer_3axisvector(PSMove *move, PSMove_3AxisVector *out_m);
+
+/**
+ * \brief Reset the magnetometer calibration state.
+ *
+ * This will reset the magnetometer calibration data, so they can be
+ * re-adjusted dynamically. Used by the calibration utility.
+ *
+ * \ref move A valid \ref PSMove handle
+ **/
+ADDAPI void
+ADDCALL psmove_reset_magnetometer_calibration(PSMove *move);
+
+/**
+ * \brief Save the magnetometer calibration values.
+ *
+ * This will save the magnetometer calibration data to persistent storage.
+ * If a calibration already exists, this will overwrite the old values.
+ *
+ * \param move A valid \ref PSMove handle
+ **/
+ADDAPI void
+ADDCALL psmove_save_magnetometer_calibration(PSMove *move);
+
+/**
+ * \brief Return the raw magnetometer calibration range.
+ *
+ * The magnetometer calibration is dynamic at runtime - this function returns
+ * the raw range of magnetometer calibration. The user should rotate the
+ * controller in all directions to find the response range of the controller
+ * (this will be dynamically adjusted).
+ *
+ * \param move A valid \ref PSMove handle
+ *
+ * \return The smallest raw sensor range difference of all three axes
+ **/
+ADDAPI float
+ADDCALL psmove_get_magnetometer_calibration_range(PSMove *move);
 
 /**
  * \brief Check if calibration is available on this controller.
@@ -1059,18 +1136,6 @@ ADDCALL psmove_get_orientation(PSMove *move,
         float *w, float *x, float *y, float *z);
 
 /**
- * \brief Get a handle to the orientation state.
- *
- * Used to directly access the orientation state to set advanced orientation features.
- *
- * \param move A valid \ref PSMove handle
- *
- * \return \ref PSMoveOrientation if orientation is enabled, NULL otherwise
- **/
-ADDAPI PSMoveOrientation *
-ADDCALL psmove_get_orientation_state(PSMove *move);
-
-/**
  * \brief Reset the current orientation quaternion.
  *
  * This will set the current 3D rotation of the PS Move controller as
@@ -1088,65 +1153,105 @@ ADDAPI void
 ADDCALL psmove_reset_orientation(PSMove *move);
 
 /**
-* \brief Get the earth magnetometer direction.
+ * \brief Set the orientation fusion algorithm to use.
+ *
+ * There are currently the following orientation filter algorithms available:
+ * OrientationFusion_MadgwickIMU - Classic MadgwickIMU: Gyro integration + Gravity correction
+ *  - 1st Least expensive
+ *  - Con: Suffers from pretty bad drift
+ * OrientationFusion_MadgwickMARG - Classic MadgwickMARG: Gyro integration + Gravity/Magnetometer correction
+ *  - 2nd least expensive
+ *  - Con: Suffers from slow drift about the yaw
+ * OrientationFusion_ComplementaryMARG - Gyro integration blended with optimized Gravity/Magnetometer alignment
+ *  - Suffers no drift
+ *  - Con: Most expensive algorithms of the three (but not horrendously so)
+
+ * \param move A valid \ref PSMove handle
+ * \param fusion_type The orientation fusion algorithm denoted by the \ref PSMoveOrientation_Fusion_Type enum
+ **/
+ADDAPI void
+ADDCALL psmove_set_orientation_fusion_type(PSMove *move, enum PSMoveOrientation_Fusion_Type fusion_type);
+
+/**
+ * \brief Set the transform used on the calibration data in the psmove_get_transform_<sensor>_... methods
+ *
+ * This method sets the transform used to modify the calibration vectors returned by:
+ * - psmove_orientation_get_magnetometer_calibration_direction()
+ * - psmove_orientation_get_gravity_calibration_direction()
+ *
+ * The transformed calibration data is used by the orientation filter to compute 
+ * a quaternion (see \ref psmove_orientation_get_quaternion) that represents 
+ * the controllers current rotation from the "identity pose".
+ * 
+ * Historically, the "identity pose" bas been with the controller laying flat
+ * with the controller pointing at the screen. However, now that we have a
+ * calibration step that record the magnetic field direction relative to 
+ * gravity it makes more sense to make the identity pose with the controller 
+ * sitting vertically since it's more stable to record that way. 
+ *  
+ * In order to maintain reverse compatibility, this transform defaults to rotating
+ * the vertically recorded calibration vectors 90 degrees about X axis as if the 
+ * controller was laying flat during calibration.
+ *
+ * Therefore, if you want a different "identity pose" then the default,
+ * use this method to set a custom transform.
+ *
+ * There are the following transforms available:
+ * - k_psmove_identity_pose_upright - "identity pose" is the controller standing upright
+ * - k_psmove_identity_pose_laying_flat - "identity pose" is the controller laying down pointed at the screen
+ *
+ * \param orientation_state A valid \ref PSMoveOrientation handle
+ * \param transform A \ref PSMove_3AxisTransform transform to apply to the calibration data
+ **/
+ADDAPI void
+ADDCALL psmove_set_calibration_transform(PSMove *move, const PSMove_3AxisTransform *transform);
+
+/**
+* \brief Get the native earth gravity direction.
 *
-* This returns the direction of the gravitational field in the identity pose during calibration.
+* This returns the native direction of the gravitational field in the identity pose during calibration.
 *
 * \param move A valid \ref PSMove handle
 *
 * \return The expected direction of gravity
 **/
 ADDAPI void
-ADDCALL psmove_get_gravity_calibration_direction(PSMove *move, PSMove_3AxisVector *out_a);
+ADDCALL psmove_get_identity_gravity_calibration_direction(PSMove *move, PSMove_3AxisVector *out_a);
 
 /**
- * \brief Reset the magnetometer calibration state.
- *
- * This will reset the magnetometer calibration data, so they can be
- * re-adjusted dynamically. Used by the calibration utility.
- *
- * \ref move A valid \ref PSMove handle
- **/
+* \brief Get the transformed earth gravity direction.
+*
+* This returns the direction of the gravitational field in the transformed identity pose.
+*
+* \param move A valid \ref PSMove handle
+*
+* \return The transformed expected direction of gravity
+**/
 ADDAPI void
-ADDCALL psmove_reset_magnetometer_calibration(PSMove *move);
-
-/**
- * \brief Save the magnetometer calibration values.
- *
- * This will save the magnetometer calibration data to persistent storage.
- * If a calibration already exists, this will overwrite the old values.
- *
- * \param move A valid \ref PSMove handle
- **/
-ADDAPI void
-ADDCALL psmove_save_magnetometer_calibration(PSMove *move);
-
-/**
- * \brief Return the raw magnetometer calibration range.
- *
- * The magnetometer calibration is dynamic at runtime - this function returns
- * the raw range of magnetometer calibration. The user should rotate the
- * controller in all directions to find the response range of the controller
- * (this will be dynamically adjusted).
- *
- * \param move A valid \ref PSMove handle
- *
- * \return The smallest raw sensor range difference of all three axes
- **/
-ADDAPI float
-ADDCALL psmove_get_magnetometer_calibration_range(PSMove *move);
+ADDCALL psmove_get_transformed_gravity_calibration_direction(PSMove *move, PSMove_3AxisVector *out_a);
 
 /**
 * \brief Get the calibration magnetometer direction.
 *
-* This returns the direction of the magnetic field in the identity pose.
+* This returns the direction of the magnetic field in the un-transformed identity pose.
 *
 * \param move A valid \ref PSMove handle
 *
 * \return The direction of the magnetic field
 **/
 ADDAPI void
-ADDCALL psmove_get_magnetometer_calibration_direction(PSMove *move, PSMove_3AxisVector *out_m);
+ADDCALL psmove_get_identity_magnetometer_calibration_direction(PSMove *move, PSMove_3AxisVector *out_m);
+
+/**
+* \brief Get the transformed calibration magnetometer direction.
+*
+* This returns the direction of the magnetic field in the transformed identity pose.
+*
+* \param move A valid \ref PSMove handle
+* \param out_m The output \ref PSMove_3AxisVector
+**/
+ADDAPI void
+ADDCALL psmove_get_transformed_magnetometer_calibration_direction(PSMove *move, PSMove_3AxisVector *out_m);
 
 /**
 * \brief Set the calibration magnetometer direction.
@@ -1159,6 +1264,97 @@ ADDCALL psmove_get_magnetometer_calibration_direction(PSMove *move, PSMove_3Axis
 **/
 ADDAPI void
 ADDCALL psmove_set_magnetometer_calibration_direction(PSMove *move, PSMove_3AxisVector *m);
+
+/**
+ * \brief Set the transform used on the sensor data in the psmove_get_transform_<sensor>_... methods
+ *
+ * This method sets the transform used to modify the sensor vectors returned by:
+ * - psmove_get_transformed_magnetometer_3axisvector()
+ * - psmove_get_transformed_accelerometer_frame_3axisvector()
+ * - psmove_get_transformed_accelerometer_frame_direction()
+ * - psmove_get_transformed_gyroscope_frame_3axisvector()
+ *
+ * The transformed sensor data is used by the orientation filter to compute 
+ * a quaternion (see \ref psmove_orientation_get_quaternion) that represents 
+ * the controllers current rotation from the "identity pose".
+ * 
+ * Historically, the sensor data in the orientation code has been rotated 90 degrees 
+ * clockwise about the x-axis. The original Madgwick orientation filter was coded to assume
+ * an OpenGL style coordinate system (+x=right, +y=up, +z=out of screen), rather than 
+ * than PSMoves coordinate system where:
+ *
+ * +x = From Select to Start button
+ * +y = From Trigger to Move button
+ * +z = From glowing orb to USB connector
+ *
+ * The current default sets the sensor transform to assume an OpenGL style coordinate system
+ * in order to maintain reverse compatibility
+ *
+ * There are the following transforms available:
+ * - k_psmove_sensor_transform_identity - Keep the sensor data as it was
+ * - k_psmove_sensor_transform_opengl - Rotate 90 degrees about the x-axis (historical default)
+ *
+ * \param orientation_state A valid \ref PSMoveOrientation handle
+ * \param transform A \ref PSMove_3AxisTransform transform to apply to the sensor data
+ **/
+ADDAPI void
+ADDCALL psmove_set_sensor_data_transform(PSMove *move, const PSMove_3AxisTransform *transform);
+
+/**
+ * \brief Get the transformed current magnetometer direction.
+ *
+ * This returns the current normalized direction of the magnetic field with the sensor transform applied.
+ *
+ * You need to call psmove_poll() first to read new data from the
+ * controller.
+ *
+ * \param move A valid \ref PSMove handle
+ * \param out_m The output \ref PSMove_3AxisVector
+ **/
+ADDAPI void
+ADDCALL psmove_get_transformed_magnetometer_direction(PSMove *move, PSMove_3AxisVector *out_m);
+
+/**
+ * \brief Get the transformed current accelerometer vector.
+ *
+ * This returns the current non-normalized vector of the accelerometer with the sensor transform applied.
+ *
+ * You need to call psmove_poll() first to read new data from the
+ * controller.
+ *
+ * \param move A valid \ref PSMove handle
+ * \param out_a The output \ref PSMove_3AxisVector
+ **/
+ADDAPI void
+ADDCALL psmove_get_transformed_accelerometer_frame_3axisvector(PSMove *move, enum PSMove_Frame frame, PSMove_3AxisVector *out_a);
+
+/**
+ * \brief Get the transformed normalized current accelerometer direction.
+ *
+ * This returns the current normalized direction of the accelerometer with the sensor transform applied.
+ *
+ * You need to call psmove_poll() first to read new data from the
+ * controller.
+ *
+ * \param move A valid \ref PSMove handle
+ * \param out_a The output \ref PSMove_3AxisVector
+ **/
+ADDAPI void
+ADDCALL psmove_get_transformed_accelerometer_frame_direction(PSMove *move, enum PSMove_Frame frame, PSMove_3AxisVector *out_a);
+
+/**
+ * \brief Get the transformed current gyroscope vector.
+ *
+ * This returns the current gyroscope vector (omega) with the sensor transform applied.
+ *
+ * You need to call psmove_poll() first to read new data from the
+ * controller.
+ *
+ * \param move A valid \ref PSMove handle
+ * \param out_w The output \ref PSMove_3AxisVector
+ **/
+ADDAPI void
+ADDCALL psmove_get_transformed_gyroscope_frame_3axisvector(PSMove *move, enum PSMove_Frame frame, PSMove_3AxisVector *out_w);
 
 /**
  * \brief Disconnect from the PS Move and release resources.
