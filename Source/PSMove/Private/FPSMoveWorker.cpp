@@ -351,25 +351,28 @@ static bool TrackingContextSetup(TrackingContext *context)
     UE_LOG(LogPSMove, Log, TEXT("Setting up PSMove Tracking Context"));
     
     // Initialize and configure the psmove_tracker.
-    // This can fail if the
-    // TODO: Expose API to allow setting resolution/framerate
     {
-        PSMoveTrackerInitSettings settings;
-        
+        PSMoveTrackerSettings settings;
         psmove_tracker_settings_set_default(&settings);
-        settings.color_mapping_max_age = 0; // Don't used cached color mapping file
-        
+        settings.color_mapping_max_age = 0;   // Don't used cached color mapping file
+        settings.exposure_mode = Exposure_LOW;
+        settings.use_fitEllipse = 1;
+        settings.camera_mirror = PSMove_True;
         context->PSMoveTracker = psmove_tracker_new_with_settings(&settings);
     }
     
     if (context->PSMoveTracker != NULL)
     {
-        //Set exposure. TODO: Make this configurable.
-        psmove_tracker_set_exposure(context->PSMoveTracker, Exposure_LOW);
-        psmove_tracker_set_mirror(context->PSMoveTracker, PSMove_True);
-        psmove_tracker_get_size(context->PSMoveTracker, &context->TrackerWidth, &context->TrackerHeight);
-        
         UE_LOG(LogPSMove, Log, TEXT("PSMove tracker initialized."));
+        
+        PSMoveTrackerSmoothingSettings smoothing_settings;
+        psmove_tracker_get_smoothing_settings(context->PSMoveTracker, &smoothing_settings);
+        smoothing_settings.filter_do_2d_r = 0;
+        smoothing_settings.filter_do_2d_xy = 0;
+        smoothing_settings.filter_3d_type = Smoothing_LowPass;
+        psmove_tracker_set_smoothing_settings(context->PSMoveTracker, &smoothing_settings);
+
+        psmove_tracker_get_size(context->PSMoveTracker, &context->TrackerWidth, &context->TrackerHeight);
         UE_LOG(LogPSMove, Log, TEXT("Camera Dimensions: %f x %f"), context->TrackerWidth, context->TrackerHeight);
     }
     else
@@ -529,15 +532,15 @@ static void ControllerUpdatePositions(PSMoveTracker *psmove_tracker,
                                       FPSMoveRawControllerData_Base *controllerData)
 {
     // Find the sphere position in the camera
-    int found_sphere_count = 0;
+    int found_sphere = 0;
     
     {
         QUICK_SCOPE_CYCLE_COUNTER(Stat_FPSMoveWorker_TrackerUpdate)
-        found_sphere_count = psmove_tracker_update_cbb(psmove_tracker, psmove);
+        found_sphere = psmove_tracker_update(psmove_tracker, psmove);
     }
     
     // Can we actually see the controller this frame?
-    controllerData->IsTracking = (found_sphere_count > 0);
+    controllerData->IsTracking = (found_sphere > 0);
 
     // Update the position of the controller
     if (controllerData->IsTracking)

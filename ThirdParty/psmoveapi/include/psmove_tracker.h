@@ -84,51 +84,87 @@ enum PSMoveTracker_Status {
 /*! Exposure modes */
 enum PSMoveTracker_Exposure {
     Exposure_LOW, /*!< Very low exposure: Good tracking, no environment visible */
-    Exposure_MEDIUM, /*!< Middle ground: Good tracking, environment visibile */
+    Exposure_MEDIUM, /*!< Middle ground: Good tracking, environment visible */
     Exposure_HIGH, /*!< High exposure: Fair tracking, but good environment */
     Exposure_INVALID, /*!< Invalid exposure value (for returning failures) */
 };
 
+/*! Smoothing algorithm used on position */
+enum PSMoveTracker_Smoothing_Type {
+	Smoothing_None,		// Don't use any smoothing
+	Smoothing_LowPass,	// A basic low pass filter (default)
+	Smoothing_Kalman,	// A more expensive Kalman filter 
+};
+
+struct _PSMoveTrackerSmoothingSettings {
+    // Low Pass Filter Options
+    int filter_do_2d_xy;        /* [1] specifies to use a adaptive x/y smoothing on pixel location */
+    int filter_do_2d_r;         /* [1] specifies to use a adaptive radius smoothing on 2d blob  */
+    enum PSMoveTracker_Smoothing_Type filter_3d_type;
+    // Kalman Filter Options
+    float acceleration_variance;
+    PSMove_3AxisTransform measurement_covariance;
+};
+typedef struct _PSMoveTrackerSmoothingSettings PSMoveTrackerSmoothingSettings;
+
+/* A structure to retain the tracker settings. Typically these do not change after init & calib.*/
 typedef struct {
-    float dimming_factor; // dimming factor used on LED RGB values
-    int blink_delay; // number of milliseconds to wait between a blink
-    int calib_min_size; // minimum size of the estimated glowing sphere during calibration process (in pixel)
-    int calib_size_std; // maximum standard deviation (in %) of the glowing spheres found during calibration process
-    int calib_max_dist; // maximum displacement of the separate found blobs
-    int color_hue_filter_range; // +- H-Range of the hsv-colorfilter
-    int color_saturation_filter_range; // +- s-Range of the hsv-colorfilter
-    int color_value_filter_range; // +- v-Range of the hsv-colorfilter
-
-    //	/* Thresholds */
-    int roi_adjust_fps_t; // the minimum fps to be reached, if a better roi-center adjusment is to be perfomred
-    int calibration_diff_t; // during calibration, all grey values in the diff image below this value are set to black
-
-    // if tracker thresholds not met, sphere is deemed not to be found
-    float tracker_quality_t1; // minimum ratio of number of pixels in blob vs pixel of estimated circle.
-    float tracker_quality_t2; // maximum allowed change of the radius in percent, compared to the last estimated radius
-    float tracker_quality_t3; // minimum radius
-    int tracker_adaptive_xy; // specifies to use a adaptive x/y smoothing
-    int tracker_adaptive_z; // specifies to use a adaptive z smoothing
-    float color_adaption_quality; // maximal distance (calculated by 'psmove_tracker_hsvcolor_diff') between the first estimated color and the newly estimated
-    float color_update_rate; // every x seconds adapt to the color, 0 means no adaption
-
-    // if color thresholds not met, color is not adapted
-    float color_update_quality_t1; // minimum ratio of number of pixels in blob vs pixel of estimated circle.
-    float color_update_quality_t2; // maximum allowed change of the radius in percent, compared to the last estimated radius
-    float color_update_quality_t3; // minimum radius
-
-    int color_mapping_max_age; // Only re-use color mappings "younger" than this time in seconds
 
     /* Camera Controls*/
-    int camera_frame_width;
-    int camera_frame_height;
-    int camera_frame_rate;
-    enum PSMove_Bool camera_auto_gain;
-    enum PSMove_Bool camera_auto_white_balance;
-    int camera_exposure; // [0,0xFFFF]
-    int camera_gain; // [0,0xFFFF]
-    int camera_brightness; // [0,0xFFFF]
-} PSMoveTrackerInitSettings; /*!< Structure for storing RGB image data */
+    int camera_frame_width;                     /* [0=auto] */
+    int camera_frame_height;                    /* [0=auto] */
+    int camera_frame_rate;                      /* [0=auto] */
+    enum PSMove_Bool camera_auto_gain;          /* [PSMove_False] */
+    int camera_gain;                            /* [0] [0,0xFFFF] */
+    enum PSMove_Bool camera_auto_white_balance; /* [PSMove_False] */
+    int camera_exposure;                        /* [(255 * 15) / 0xFFFF] [0,0xFFFF] */
+    int camera_brightness;                      /* [0] [0,0xFFFF] */
+    enum PSMove_Bool camera_mirror;             /* [PSMove_False] mirror camera image horizontally */
+
+    /* Settings for camera calibration process */
+    enum PSMoveTracker_Exposure exposure_mode;  /* [Exposure_LOW] exposure mode for setting target luminance */
+    int calibration_blink_delay;                /* [200] number of milliseconds to wait between a blink  */
+    int calibration_diff_t;                     /* [20] during calibration, all grey values in the diff image below this value are set to black  */
+    int calibration_min_size;                   /* [50] minimum size of the estimated glowing sphere during calibration process (in pixel)  */
+    int calibration_max_distance;               /* [30] maximum displacement of the separate found blobs  */
+    int calibration_size_std;                   /* [10] maximum standard deviation (in %) of the glowing spheres found during calibration process  */
+    int color_mapping_max_age;                  /* [2*60*60] Only re-use color mappings "younger" than this time in seconds  */
+    float dimming_factor;                       /* [1.f] dimming factor used on LED RGB values  */
+    
+    /* Settings for OpenCV image processing for sphere detection */
+    int color_hue_filter_range;                 /* [20] +- range of Hue window of the hsv-colorfilter  */
+    int color_saturation_filter_range;          /* [85] +- range of Sat window of the hsv-colorfilter  */
+    int color_value_filter_range;               /* [85] +- range of Value window of the hsv-colorfilter  */
+
+    /* Settings for tracker algorithms */
+    int use_fitEllipse;                         /* [0] estimate circle from blob; [1] use fitEllipse */
+
+    float color_adaption_quality_t;             /* [35] maximal distance (calculated by 'psmove_tracker_hsvcolor_diff') between the first estimated color and the newly estimated  */
+    float color_update_rate;                    /* [1] every x seconds adapt to the color, 0 means no adaption  */
+    // size of "search" tiles when tracking is lost
+    int search_tile_width;                      /* [0=auto] width of a single tile */
+    int search_tile_height;                     /* height of a single tile */
+    int search_tiles_horizontal;                /* number of search tiles per row */
+    int search_tiles_count;                     /* number of search tiles */
+
+    /* THP-specific tracker threshold checks */
+    int roi_adjust_fps_t;                       /* [160] the minimum fps to be reached, if a better roi-center adjusment is to be perfomred */
+    // if tracker thresholds not met, sphere is deemed not to be found
+    float tracker_quality_t1;                   /* [0.3f] minimum ratio of number of pixels in blob vs pixel of estimated circle. */
+    float tracker_quality_t2;                   /* [0.7f] maximum allowed change of the radius in percent, compared to the last estimated radius */
+    float tracker_quality_t3;                   /* [4.7f] minimum radius  */
+    // if color thresholds not met, color is not adapted
+    float color_update_quality_t1;              /* [0.8] minimum ratio of number of pixels in blob vs pixel of estimated circle. */
+    float color_update_quality_t2;              /* [0.2] maximum allowed change of the radius in percent, compared to the last estimated radius */
+    float color_update_quality_t3;              /* [6.f] minimum radius */
+
+    /* CBB-specific tracker parameters */
+    float xorigin_cm;                           /* [0.f] x-distance to subtract from calculated position */
+    float yorigin_cm;                           /* [0.f] y-distance to subtract from calculated position */
+    float zorigin_cm;                           /* [0.f] z-distance to subtract from calculated position */
+
+} PSMoveTrackerSettings; /*!< Structure for storing tracker settings */
+
 
 /**
 * \brief Initializes a tracker settings with default values
@@ -138,7 +174,21 @@ typedef struct {
 *
 **/
 ADDAPI void
-ADDCALL psmove_tracker_settings_set_default(PSMoveTrackerInitSettings *settings);
+ADDCALL psmove_tracker_settings_set_default(PSMoveTrackerSettings *settings);
+
+/**
+* \brief Copies current tracker settings from tracker into settings.
+*
+**/
+ADDAPI void
+ADDCALL psmove_tracker_get_settings(PSMoveTracker *tracker, PSMoveTrackerSettings *settings);
+
+/**
+* \brief Copies settings into tracker settings.
+*
+**/
+ADDAPI void
+ADDCALL psmove_tracker_set_settings(PSMoveTracker *tracker, PSMoveTrackerSettings *settings);
 
 /**
  * \brief Create a new PS Move Tracker instance and open the camera
@@ -166,7 +216,7 @@ ADDCALL psmove_tracker_new();
 * \return A new \ref PSMoveTracker instance or \c NULL on error
 **/
 ADDAPI PSMoveTracker *
-ADDCALL psmove_tracker_new_with_settings(PSMoveTrackerInitSettings *settings);
+ADDCALL psmove_tracker_new_with_settings(PSMoveTrackerSettings *settings);
 
 /**
  * \brief Create a new PS Move Tracker instance with a specific camera
@@ -199,11 +249,21 @@ ADDCALL psmove_tracker_new_with_camera(int camera);
 * \return A new \ref PSMoveTracker instance or \c NULL on error
 **/
 ADDAPI PSMoveTracker *
-ADDCALL psmove_tracker_new_with_camera_and_settings(int camera, PSMoveTrackerInitSettings *settings);
+ADDCALL psmove_tracker_new_with_camera_and_settings(int camera, PSMoveTrackerSettings *settings);
 
+/**
+ * \brief Instructs the PSMoveTracker to load its distortion settings from file.
+ *
+ * \param tracker A valid \ref PSMoveTracker handle
+ **/
 ADDAPI void
 ADDCALL psmove_tracker_load_distortion(PSMoveTracker *tracker);
 
+/**
+ * \brief Instructs the PSMoveTracker to set its distortion to 0.
+ *
+ * \param tracker A valid \ref PSMoveTracker handle
+ **/
 ADDAPI void
 ADDCALL psmove_tracker_reset_distortion(PSMoveTracker *tracker);
 
@@ -293,16 +353,72 @@ ADDAPI enum PSMoveTracker_Exposure
 ADDCALL psmove_tracker_get_exposure(PSMoveTracker *tracker);
 
 /**
-* \brief Set whether or not the tracker should do smoothing.
+ * \brief Set the smoothing filter settings.
+ *
+ * \param tracker A valid \ref PSMoveTracker handle
+ *
+ * \param smoothing_settings A valid \ref PSMoveTrackerSmoothingSettings handle
+ **/
+ADDAPI void
+ADDCALL psmove_tracker_set_smoothing_settings(PSMoveTracker *tracker, PSMoveTrackerSmoothingSettings *smoothing_settings);
+
+/**
+ * \brief Copy the tracker's smoothing filter settings to smoothing_settings.
+ *
+ * \param tracker A valid \ref PSMoveTracker handle
+ *
+ * \param smoothing_settings A valid \ref PSMoveTrackerSmoothingSettings handle
+ **/
+ADDAPI void
+ADDCALL psmove_tracker_get_smoothing_settings(PSMoveTracker *tracker, PSMoveTrackerSmoothingSettings *smoothing_settings);
+
+/**
+* \brief Initializes a tracker smoothing settings with default values
+*
+* These values are overridden if the smoothing settings calibration file exists
+**/
+ADDAPI void
+ADDCALL psmove_tracker_smoothing_settings_set_default(PSMoveTrackerSmoothingSettings *smoothing_settings);
+
+/**
+* \brief Save the given smoothing settings to disk
+*
+* These values when loaded, take precedence over the defaults.
+*
+* \return A new PSMove_True on success, PSMove_False on IO error
+**/
+ADDAPI enum PSMove_Bool
+ADDCALL psmove_tracker_save_smoothing_settings(PSMoveTrackerSmoothingSettings *smoothing_settings);
+
+/**
+* \brief Load the smoothing settings from disk
+*
+* These values are take precedence over the defaults.
+*
+* \return A new PSMove_True on success, PSMove_False on IO error**/
+ADDAPI enum PSMove_Bool
+ADDCALL psmove_tracker_load_smoothing_settings(PSMoveTrackerSmoothingSettings *out_smoothing_settings);
+
+/**
+* \brief Set the positional smoothing algorithm to use.
+*
+* \param tracker A valid \ref PSMoveTracker handle
+* \param smoothing_type The smoothing algorithm to use (see \ref PSMoveTracker_Smoothing_Type).
+**/
+ADDAPI void
+ADDCALL psmove_tracker_set_smoothing_type(PSMoveTracker *tracker, enum PSMoveTracker_Smoothing_Type smoothing_type);
+
+/**
+* \brief Set the smoothing parameters for the basic low pass filter.
 *
 * This function enables (1) or disables (0) smoothing for xy and z dimensions.
 *
 * \param tracker A valid \ref PSMoveTracker handle
-* \param adaptive_xy int 0 or 1
-* \param adaptive_z int 0 or 1
+* \param filter_lowpass_do_xy int 0 or 1
+* \param filter_lowpass_do_z int 0 or 1
 **/
 ADDAPI void
-ADDCALL psmove_tracker_set_smoothing(PSMoveTracker *tracker, int adaptive_xy, int adaptive_z);
+ADDCALL psmove_tracker_set_smoothing_2d(PSMoveTracker *tracker, int filter_lowpass_do_xy, int filter_lowpass_do_z);
 
 /**
  * \brief Enable or disable camera image deinterlacing (line doubling)
@@ -516,8 +632,8 @@ ADDCALL psmove_tracker_update_image(PSMoveTracker *tracker);
  * \brief Process incoming data and update tracking information
  *
  * This function tracks one or all motion controllers in the camera
- * image, and updates tracking information such as position, radius
- * and camera color.
+ * image, and updates tracking information such as pixel position,
+ * 3D position, and camera color.
  *
  * This function must be called after psmove_tracker_update_image().
  *
@@ -529,24 +645,6 @@ ADDCALL psmove_tracker_update_image(PSMoveTracker *tracker);
  **/
 ADDAPI int
 ADDCALL psmove_tracker_update(PSMoveTracker *tracker, PSMove *move);
-
-/**
- * \brief Process incoming data and update tracking information
- *
- * This function tracks one or all motion controllers in the camera
- * image, and updates tracking information such as 3D position
- * and camera color.
- *
- * This function must be called after psmove_tracker_update_image().
- *
- * \param tracker A valid \ref PSMoveTracker handle
- * \param move A valid \ref PSMove handle (to update a single controller)
- *             or \c NULL to update all enabled controllers at once
- *
- * \return Nonzero if tracking was successful, zero otherwise
- **/
-ADDAPI int
-ADDCALL psmove_tracker_update_cbb(PSMoveTracker *tracker, PSMove *move);
 
 /**
  * \brief Draw debugging information onto the current camera image
@@ -649,34 +747,6 @@ PSMove *move, float *xcm, float *ycm, float *zcm);
 ADDAPI void
 ADDCALL psmove_tracker_reset_location(PSMoveTracker *tracker, PSMove *move);
 
-/**
-* \brief Get the current 3D location of a tracked controller
-*
-* This function obtains the location of a controller in the
-* world in cm.
-*
-* \param tracker A valid \ref PSMoveTracker handle
-* \param move A valid \ref PSMove handle
-* \param xcm A pointer to store the X part of the location, or \c NULL
-* \param ycm A pointer to store the Y part of the location, or \c NULL
-* \param zcm A pointer to store the Z part of the location, or \c NULL
-*
-* \return The age of the sensor reading in milliseconds, or -1 on error
-**/
-ADDAPI int
-ADDCALL psmove_tracker_get_location(PSMoveTracker *tracker,
-PSMove *move, float *xcm, float *ycm, float *zcm);
-
-
-/**
-* \brief Rest the location offsets to the current location
-*
-* \param tracker A valid \ref PSMoveTracker handle
-* \param move A valid \ref PSMove handle
-*
-**/
-ADDAPI void
-ADDCALL psmove_tracker_reset_location(PSMoveTracker *tracker, PSMove *move);
 
 /**
  * \brief Get the camera image size for the tracker
