@@ -18,10 +18,10 @@ static const float CONTROLLER_COUNT_POLL_INTERVAL = 1000.f; // milliseconds
 // and references to the shared (controller independent) data and the controller(s) data.
 struct TrackingContext
 {
-    FPSMoveRawSharedData_TLS *WorkerSharedData;
     FPSMoveRawControllerWorkerData_TLS *WorkerControllerDataArray;
     
     PSMove* PSMoves[FPSMoveWorker::k_max_controllers];
+    int32 PSMoveCount;
     uint32 LastMoveCountCheckTime;
     
     PSMoveTracker *PSMoveTracker;
@@ -31,9 +31,7 @@ struct TrackingContext
     PSMoveFusion *PSMoveFusion;
     
     // Constructor
-    TrackingContext(FPSMoveRawSharedData_TLS *sharedData,
-                    FPSMoveRawControllerWorkerData_TLS *controllerDataArray) :
-        WorkerSharedData(sharedData),
+    TrackingContext(FPSMoveRawControllerWorkerData_TLS *controllerDataArray) :
         WorkerControllerDataArray(controllerDataArray)
     {
         Reset();
@@ -45,14 +43,12 @@ struct TrackingContext
     void Reset()
     {
         memset(PSMoves, 0, sizeof(PSMoves));
+        PSMoveCount = 0;
         LastMoveCountCheckTime = 0;
         PSMoveTracker = NULL;
         TrackerWidth = 0;
         TrackerHeight = 0;
-        PSMoveFusion = NULL;
-        
-        // Make sure all of the controller-independent state is reset
-        WorkerSharedData->Reset();
+        PSMoveFusion = NULL;        
     }
 };
 
@@ -76,23 +72,18 @@ FPSMoveWorker* FPSMoveWorker::WorkerInstance = NULL;
 // The worker spawns the thread that communicates with the PSMoveAPI in parallel to the game thread.
 FPSMoveWorker::FPSMoveWorker() :
     AcquiredContextCounter(0),
-    StopTaskCounter(0),
-    WorkerSharedData(),
-    WorkerSharedData_Concurrent()
+    StopTaskCounter(0)
 {
-    // Bind the shared worker concurrent data to its corresponding thread-local container
-    WorkerSharedData.ConcurrentData = &WorkerSharedData_Concurrent;
-    
-    // Setup the controller data entries
-    for (int32 controller_index = 0; controller_index < FPSMoveWorker::k_max_controllers; ++controller_index)
-    {
-        // Make sure the controller entries are initialized
-        WorkerControllerDataArray[controller_index].Clear();
-        WorkerControllerDataArray_Concurrent[controller_index].Clear();
+	// Setup the controller data entries
+	for (int32 controller_index = 0; controller_index < FPSMoveWorker::k_max_controllers; ++controller_index)
+	{
+		// Make sure the controller entries are initialized
+		WorkerControllerDataArray[controller_index].Clear();
+		WorkerControllerDataArray_Concurrent[controller_index].Clear();
 
-        // Bind the controller worker concurrent data to its corresponding thread-local container
-        WorkerControllerDataArray[controller_index].ConcurrentData = &WorkerControllerDataArray_Concurrent[controller_index];
-    }
+		// Bind the controller worker concurrent data to its corresponding thread-local container
+		WorkerControllerDataArray[controller_index].ConcurrentData = &WorkerControllerDataArray_Concurrent[controller_index];
+	}
     
     // This Inits and Runs the thread.
     Thread = FRunnableThread::Create(this, TEXT("FPSMoveWorker"), 0, TPri_Normal);
@@ -111,32 +102,31 @@ bool FPSMoveWorker::Init()
 }
 
 bool FPSMoveWorker::AcquirePSMove(
-    int32 PSMoveID,
-    FPSMoveDataContext *DataContext)
+	int32 PSMoveID,
+	FPSMoveDataContext *DataContext)
 {
-    bool success = false;
+	bool success = false;
 
-    if (PSMoveID >= 0 && PSMoveID < FPSMoveWorker::k_max_controllers)
-    {
-        // Remember which PSMove the data context is assigned to
-        DataContext->Clear();
-        DataContext->PSMoveID = PSMoveID;
+	if (PSMoveID >= 0 && PSMoveID < FPSMoveWorker::k_max_controllers)
+	{
+		// Remember which PSMove the data context is assigned to
+		DataContext->Clear();
+		DataContext->PSMoveID = PSMoveID;
 
-        // Bind the data context to the concurrent data for the requested controller
-        // This doesn't mean  that the controller is active, just that a component
-        // is now watching this block of data.
-        // Also this is thread safe because were not actually looking at the concurrent data
-        // at this point, just assigning a pointer to the concurrent data.
-        DataContext->RawSharedData.ConcurrentData = &WorkerSharedData_Concurrent;
-        DataContext->RawControllerData.ConcurrentData = &WorkerControllerDataArray_Concurrent[PSMoveID];
+		// Bind the data context to the concurrent data for the requested controller
+		// This doesn't mean  that the controller is active, just that a component
+		// is now watching this block of data.
+		// Also this is thread safe because were not actually looking at the concurrent data
+		// at this point, just assigning a pointer to the concurrent data.
+		DataContext->RawControllerData.ConcurrentData = &WorkerControllerDataArray_Concurrent[PSMoveID];
         
         // The worker thread will create a tracker if one isn't active at this moment
         AcquiredContextCounter.Increment();
 
-        success = true;
-    }
+		success = true;
+	}
 
-    return success;
+	return success;
 }
 
 void FPSMoveWorker::ReleasePSMove(FPSMoveDataContext *DataContext)
@@ -158,7 +148,7 @@ uint32 FPSMoveWorker::Run()
     // * psmove fusion state
     // * psmove controller state
     // Tracking state is only initialized when we have a non-zero number of tracking contexts
-    TrackingContext Context(&WorkerSharedData, WorkerControllerDataArray);
+    TrackingContext Context(WorkerControllerDataArray);
     
     if (!psmove_init(PSMOVE_CURRENT_VERSION))
     {
@@ -183,16 +173,9 @@ uint32 FPSMoveWorker::Run()
         if (TrackingContextIsSetup(&Context))
         {
             QUICK_SCOPE_CYCLE_COUNTER(Stat_FPSMoveWorker_RunLoop)
-            
-            //--------------
-            // Read the published data from the components. Currently this does nothing.
-            //--------------
-            WorkerSharedData.WorkerRead();
-            
+                       
             // Setup or tear down controller connections based on the number of active controllers
-            {
-                const bool countrollerCountChanged = TrackingContextUpdateControllerConnections(&Context);
-            }
+            TrackingContextUpdateControllerConnections(&Context);
             
             // Update the raw positions of the controllers
             {
@@ -206,7 +189,7 @@ uint32 FPSMoveWorker::Run()
             {
                 QUICK_SCOPE_CYCLE_COUNTER(Stat_FPSMoveWorker_Position)
                 
-                for (int psmove_id = 0; psmove_id < WorkerSharedData.PSMoveCount; psmove_id++)
+                for (int psmove_id = 0; psmove_id < Context.PSMoveCount; psmove_id++)
                 {
                     FPSMoveRawControllerWorkerData_TLS &localControllerData = WorkerControllerDataArray[psmove_id];
                     
@@ -221,7 +204,7 @@ uint32 FPSMoveWorker::Run()
             {
                 QUICK_SCOPE_CYCLE_COUNTER(Stat_FPSMoveWorker_Polling)
                 
-                for (int psmove_id = 0; psmove_id < WorkerSharedData.PSMoveCount; psmove_id++)
+                for (int psmove_id = 0; psmove_id < Context.PSMoveCount; psmove_id++)
                 {
                     //TODO: Is it necessary to keep polling until no frames are left?
                     while (psmove_poll(Context.PSMoves[psmove_id]) > 0)
@@ -262,20 +245,20 @@ uint32 FPSMoveWorker::Run()
                             UE_LOG(LogPSMove, Log, TEXT("FPSMoveWorker:: CYCLE COLOUR"));
                             psmove_tracker_cycle_color(Context.PSMoveTracker, Context.PSMoves[psmove_id]);
                             localControllerData.CycleColourRequest = false;
-                        }
+                             }
 
                         // Publish the worker data to the component. e.g., Position, Orientation, Buttons
                         // This also publishes updated ResetPoseRequest and CycleColourRequest.
                         localControllerData.WorkerPost();
+                             }
+                        }
                     }
-                }
-            }
             
             // Update the clock. This is left in here from old code in case we need a clock in the future (e.g., prediction)
             {
                 QUICK_SCOPE_CYCLE_COUNTER(Stat_FPSMoveWorker_Filtering)
                 
-                for (int psmove_id = 0; psmove_id < WorkerSharedData.PSMoveCount; psmove_id++)
+                for (int psmove_id = 0; psmove_id < Context.PSMoveCount; psmove_id++)
                 {
                     FPSMoveRawControllerWorkerData_TLS &localControllerData = WorkerControllerDataArray[psmove_id];
                     
@@ -284,11 +267,6 @@ uint32 FPSMoveWorker::Run()
                     localControllerData.Clock.Update();
                 }
             }
-            
-            //--------------
-            // Publish the shared (controller independent) worker data to the component. Currently this does nothing.
-            //--------------
-            WorkerSharedData.WorkerPost();
         }
         else
         {
@@ -354,7 +332,7 @@ static bool TrackingContextSetup(TrackingContext *context)
     {
         PSMoveTrackerSettings settings;
         psmove_tracker_settings_set_default(&settings);
-        settings.color_mapping_max_age = 0;   // Don't used cached color mapping file
+        settings.color_mapping_max_age = 0; // Don't used cached color mapping file
         settings.exposure_mode = Exposure_LOW;
         settings.use_fitEllipse = 1;
         settings.camera_mirror = PSMove_True;
@@ -423,18 +401,18 @@ static bool TrackingContextUpdateControllerConnections(TrackingContext *context)
         // Update the number
         int newcount = psmove_count_connected();
         
-        if (context->WorkerSharedData->PSMoveCount != newcount)
+        if (context->PSMoveCount != newcount)
         {
-            UE_LOG(LogPSMove, Log, TEXT("PSMove Controllers count changed: %d -> %d."), context->WorkerSharedData->PSMoveCount, newcount);
+            UE_LOG(LogPSMove, Log, TEXT("PSMove Controllers count changed: %d -> %d."), context->PSMoveCount, newcount);
             
-            context->WorkerSharedData->PSMoveCount = newcount;
+            context->PSMoveCount = newcount;
             controllerCountChanged = true;
         }
         
         // Refresh the connection and tracking state of every controller entry
         for (int psmove_id = 0; psmove_id < FPSMoveWorker::k_max_controllers; psmove_id++)
         {
-            if (psmove_id < context->WorkerSharedData->PSMoveCount)
+            if (psmove_id < context->PSMoveCount)
             {
                 if (context->PSMoves[psmove_id] == NULL)
                 {
@@ -579,7 +557,6 @@ static void ControllerUpdateButtonState(PSMove *psmove,
 {
     // Get the controller button state
     controllerData->Buttons = psmove_get_buttons(psmove);  // Bitwise; tells if each button is down.
-    psmove_get_button_events(psmove, &controllerData->Pressed, &controllerData->Released);  // i.e., state change
     
     // Get the controller trigger value (uint8; 0-255)
     controllerData->TriggerValue = psmove_get_trigger(psmove);

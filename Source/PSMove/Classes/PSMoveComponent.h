@@ -2,10 +2,11 @@
 
 #include "PSMoveTypes.h"
 #include "FPSMove.h"
+#include "IMotionController.h"
 #include "PSMoveComponent.generated.h"
 
 UCLASS(ClassGroup="Input Controller", meta=(BlueprintSpawnableComponent))
-class UPSMoveComponent : public USceneComponent//, public IPSMoveInterface
+class UPSMoveComponent : public USceneComponent
 {
     GENERATED_UCLASS_BODY()
 
@@ -24,16 +25,14 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = PSMove)
     int32 PlayerIndex;
 
-    // PSMove controller ID - 0-based
+    // Whether this is the right or the left hand of the player
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = PSMove)
-    int32 PSMoveID;
- 
-    UPROPERTY()
-    FPSMoveDataContext DataContext;
-    
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = PSMove)
-    uint8 RumbleRequest;
+	TEnumAsByte<EControllerHand> Hand;
 
+	// Set the position and orientation of the actor on update
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = PSMove)
+	bool ApplyTransformToActor;
+    
     UFUNCTION(BlueprintCallable, Category = PSMove)
     void ResetPose();
 
@@ -42,43 +41,7 @@ public:
 
     UFUNCTION(BlueprintCallable, Category = PSMove)
     void CycleColours();
-
-    // Delegate triggered once per frame update
-    UPROPERTY(BlueprintAssignable, Category = PSMove)
-    FPSMoveDataUpdatedDelegate OnDataUpdated;
     
-    // Delegates for buttons.
-    UPROPERTY(BlueprintAssignable, Category = PSMove)
-    FPSMoveButtonStateDelegate OnTriangleButton;
-    
-    UPROPERTY(BlueprintAssignable, Category = PSMove)
-    FPSMoveButtonStateDelegate OnCircleButton;
-    
-    UPROPERTY(BlueprintAssignable, Category = PSMove)
-    FPSMoveButtonStateDelegate OnCrossButton;
-    
-    UPROPERTY(BlueprintAssignable, Category = PSMove)
-    FPSMoveButtonStateDelegate OnSquareButton;
-    
-    UPROPERTY(BlueprintAssignable, Category = PSMove)
-    FPSMoveButtonStateDelegate OnSelectButton;
-    
-    UPROPERTY(BlueprintAssignable, Category = PSMove)
-    FPSMoveButtonStateDelegate OnStartButton;
-    
-    UPROPERTY(BlueprintAssignable, Category = PSMove)
-    FPSMoveButtonStateDelegate OnPSButton;
-    
-    UPROPERTY(BlueprintAssignable, Category = PSMove)
-    FPSMoveButtonStateDelegate OnMoveButton;
-    
-    UPROPERTY(BlueprintAssignable, Category = PSMove)
-    FPSMoveTriggerButtonDelegate OnTriggerButton;
-    
-protected:
-
 private:
-    FQuat ZeroYaw;
-    FVector LastPosition;
-    FQuat LastOrientation;
+    FPSMoveDataContext *DataContextPtr;
 };

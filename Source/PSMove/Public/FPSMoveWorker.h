@@ -63,9 +63,6 @@ private:
     /** Thread Safe Counter. When incremented by Stop (which is called only by ShutdownSingleton)*/
     FThreadSafeCounter StopTaskCounter;
     
-    /** Shared data shared amongst all controllers  (i.e. configuration data)  */
-    FPSMoveRawSharedData_TLS WorkerSharedData;
-
     /** An array of raw data structures, one for each controller */
     FPSMoveRawControllerWorkerData_TLS WorkerControllerDataArray[k_max_controllers];
 
@@ -73,6 +70,5 @@ private:
      * Published worker data that shouldn't be touched directly.
      * Access through _TLS version of the structures. 
      */
-    FPSMoveRawSharedData_Concurrent WorkerSharedData_Concurrent;
     FPSMoveRawControllerData_Concurrent WorkerControllerDataArray_Concurrent[k_max_controllers];
 };

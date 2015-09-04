@@ -8,14 +8,15 @@
 	"CreatedByURL" : "https://github.com/cboulay/psmove-ue4",
 	"EngineVersion" : "4.7.0",
 	"Description" : "Playstation Move input.",
-	"Category" : "Input.Controller",
+	"Category" : "Input Devices",
 	"EnabledByDefault" : true,
 	
 	"Modules" :
 	[
 		{
 			"Name" : "PSMove",
-			"Type" : "Runtime"
+			"Type" : "Runtime",
+            "WhitelistPlatforms" : [ "Win64", "Mac" ]
 		}
 	]
 }

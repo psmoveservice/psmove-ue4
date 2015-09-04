@@ -1,6 +1,8 @@
 #pragma once
 
 #include "ModuleManager.h"
+#include "IMotionController.h"
+#include "IInputDeviceModule.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogPSMove, Log, All);
 
@@ -10,12 +12,9 @@ DEFINE_LOG_CATEGORY_STATIC(LogPSMove, Log, All);
 
 struct FPSMoveDataContext;
 
-class FPSMove : public IModuleInterface //, public IModularFeature?
+class FPSMove : public IInputDeviceModule
 {
-public:
-    virtual void StartupModule();
-    virtual void ShutdownModule();
-    
+public:  
     /**
      * Singleton-like access to this module's interface.  This is just for convenience!
      * Beware of calling this during the shutdown phase, though.  Your module might have been unloaded already.
@@ -42,10 +41,16 @@ public:
     *
     * @return True if we can successfully acquire the controller.
     */
-    virtual bool AcquirePSMove(int32 PSMoveID, FPSMoveDataContext *DataContext);
+    virtual bool AcquirePSMove(int32 PlayerIndex, EControllerHand Hand, FPSMoveDataContext **OutDataContext)
+    {
+        // implemented in internal class
+        return false;
+    }
     
     /**
      * Tell the PSMove module that we don't care about listening to this controller anymore.
      */
-    virtual void ReleasePSMove(FPSMoveDataContext *DataContext);
+    virtual void ReleasePSMove(FPSMoveDataContext *DataContext)
+    {
+    }
 };

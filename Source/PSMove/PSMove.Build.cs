@@ -49,6 +49,7 @@ namespace UnrealBuildTool.Rules
                     "Core",
                     "CoreUObject",          // Actors and Structs
                     "InputCore",            // Provides LOCTEXT and other Input features
+                    "InputDevice",
                     "HeadMountedDisplay",    // Eventually we may want to have the plugin contain its own calibration methods.
                     //"OculusRift", // Should be loaded dynamically
                     // ... add other public dependencies that you statically link with here ...

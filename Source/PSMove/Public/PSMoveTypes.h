@@ -16,142 +16,6 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPSMoveTriggerButtonDelegate, uint8,
 // Structures
 //---------------------------------------------------
 
-// Data needed by the worker common to all active move controllers.
-// Currently this is only used for communicating PSMoveCount, but it could be
-// used for other things common to all controllers (e.g., tracker settings).
-USTRUCT()
-struct FPSMoveRawSharedData_Base
-{
-    GENERATED_USTRUCT_BODY();
-    
-    UPROPERTY()
-    uint8 PSMoveCount;
-    
-    UPROPERTY()
-    bool ComponentHasReadWorkerData;  //Unused?
-    
-    FPSMoveRawSharedData_Base()
-    {
-        Clear();
-    }
-    
-    inline void Clear()
-    {
-        PSMoveCount = 0;
-        ComponentHasReadWorkerData = true; //Unused?
-    }
-};
-
-// A lockable version of the data frame to be used by the worker thread.
-USTRUCT()
-struct FPSMoveRawSharedData_Concurrent : public FPSMoveRawSharedData_Base
-{
-    GENERATED_USTRUCT_BODY();
-    
-    // Used to make sure we're accessing the data in a thread safe way
-    FCriticalSection Lock;
-    
-    FPSMoveRawSharedData_Concurrent() :
-        Lock()
-    {
-        Clear();
-    }
-    
-    inline void Clear()
-    {
-        FPSMoveRawSharedData_Base::Clear();
-    }
-};
-
-// A version of the data shared data frame to be used by the component.
-USTRUCT()
-struct FPSMoveRawSharedData_TLS : public FPSMoveRawSharedData_Base
-{
-    GENERATED_USTRUCT_BODY();
-    
-    // This is a pointer to the worker's copy of the data.
-    FPSMoveRawSharedData_Concurrent *ConcurrentData;
-    
-    // Flag to denote the worker has modified its TLS data
-    bool WorkerHasModifiedTLSData;
-    
-    FPSMoveRawSharedData_TLS()
-    {
-        ConcurrentData = nullptr;
-        Reset();
-    }
-    
-    void Reset()
-    {
-        FPSMoveRawSharedData_Base::Clear();
-        WorkerHasModifiedTLSData= false;
-    }
-    
-    bool IsValid() const
-    {
-        return ConcurrentData != nullptr;
-    }
-    
-    void MarkDirty()
-    {
-        this->WorkerHasModifiedTLSData = true;
-    }
-    
-    void ComponentRead()
-    {
-        FPSMoveHitchWatchdog watchdog(TEXT("FPSMoveRawSharedData_TLS::ComponentRead"), 500);
-        
-        {
-            FScopeLock scopeLock(&ConcurrentData->Lock);
-            
-            // Read the worker thread's data into the component thread's data
-            this->PSMoveCount = ConcurrentData->PSMoveCount;
-            
-            // We've read the data the worker posted, so it's no longer dirty
-            this->ComponentHasReadWorkerData = true;
-            ConcurrentData->ComponentHasReadWorkerData = true;
-        }
-    }
-
-    void ComponentPost()
-    {
-        FPSMoveHitchWatchdog watchdog(TEXT("FPSMoveRawSharedData_TLS::ComponentPost"), 500);
-
-        {
-            FScopeLock scopeLock(&ConcurrentData->Lock);
-        }
-    }
-    
-    void WorkerRead()
-    {
-        FPSMoveHitchWatchdog watchdog(TEXT("FPSMoveRawSharedData_TLS::WorkerRead"), 500);
-        
-        {
-            FScopeLock scopeLock(&ConcurrentData->Lock);
-            
-            // Read the component thread's data into the worker thread's data
-            this->ComponentHasReadWorkerData = ConcurrentData->ComponentHasReadWorkerData;
-        }
-    }
-    
-    void WorkerPost()
-    {
-        FPSMoveHitchWatchdog watchdog(TEXT("FPSMoveRawSharedData_TLS::WorkerPost"), 500);
-        
-        if (WorkerHasModifiedTLSData)
-        {
-            FScopeLock scopeLock(&ConcurrentData->Lock);
-            
-            // The component has new data to read from the worker thread
-            ConcurrentData->ComponentHasReadWorkerData = false;
-            this->ComponentHasReadWorkerData = false;
-            
-            // The worker threads TLS data is no longer dirty
-            WorkerHasModifiedTLSData = false;
-        }
-    }
-};
-
 // The controller-specific data frame
 USTRUCT()
 struct FPSMoveRawControllerData_Base
@@ -170,13 +34,7 @@ struct FPSMoveRawControllerData_Base
     
     UPROPERTY()
     uint32 Buttons;
-    
-    UPROPERTY()
-    uint32 Pressed;
-    
-    UPROPERTY()
-    uint32 Released;
-    
+       
     UPROPERTY()
     uint8 TriggerValue;
 
@@ -188,10 +46,10 @@ struct FPSMoveRawControllerData_Base
     
     UPROPERTY()
     bool IsEnabled;             // Whether or not the tracker is tracking this specific controller
-    
-    UPROPERTY()
-    bool IsCalibrated;          // I don't know
 
+	UPROPERTY()
+	int32 SequenceNumber;       // Increments with every update
+    
     // -------
     // Data items that typically get filled by the game object (i.e., PSMoveComponent)
     // then are passed to the worker thread.
@@ -215,14 +73,11 @@ struct FPSMoveRawControllerData_Base
         PSMovePosition = FVector::ZeroVector;
         PSMoveOrientation = FQuat::Identity;
         Buttons = 0;
-        Pressed = 0;
-        Released = 0;
         TriggerValue = 0;
         RumbleRequest = 0;
         ResetPoseRequest = false;
         CycleColourRequest = false;
         IsConnected = false;
-        IsCalibrated = false;
         IsTracking = false;
         IsEnabled = false;
     }
@@ -276,29 +131,6 @@ struct FPSMoveRawControllerData_TLS : public FPSMoveRawControllerData_Base
         return ConcurrentData != nullptr;
     }
 
-    void ComponentRead()
-    {
-        FPSMoveHitchWatchdog watchdog(TEXT("FPSMoveRawControllerData_TLS::ComponentPostAndRead"), 500);
-        {
-            FScopeLock scopeLock(&ConcurrentData->Lock);
-
-            // Read the worker thread's data into the component thread's data
-            this->PSMovePosition = ConcurrentData->PSMovePosition;
-            this->PSMoveOrientation = ConcurrentData->PSMoveOrientation;
-            this->Buttons = ConcurrentData->Buttons;
-            this->Pressed = ConcurrentData->Pressed;
-            this->Released = ConcurrentData->Released;
-            this->TriggerValue = ConcurrentData->TriggerValue;
-            this->IsConnected = ConcurrentData->IsConnected;
-            this->IsTracking = ConcurrentData->IsTracking;
-            this->IsEnabled = ConcurrentData->IsEnabled;
-            this->IsCalibrated = ConcurrentData->IsCalibrated;
-
-            this->CycleColourRequest = ConcurrentData->CycleColourRequest;
-            this->ResetPoseRequest = ConcurrentData->ResetPoseRequest;
-        }
-    }
-
     void ComponentPost()
     {
         FPSMoveHitchWatchdog watchdog(TEXT("FPSMoveRawControllerData_TLS::ComponentPostAndRead"), 500);
@@ -309,8 +141,31 @@ struct FPSMoveRawControllerData_TLS : public FPSMoveRawControllerData_Base
             ConcurrentData->RumbleRequest = this->RumbleRequest;
             ConcurrentData->ResetPoseRequest = this->ResetPoseRequest;
             ConcurrentData->CycleColourRequest = this->CycleColourRequest;
+
+            // Clear the edge triggered flags after copying to concurrent state
+            this->ResetPoseRequest= false;
+            this->CycleColourRequest= false;
         }
     }
+
+	void InputManagerPostAndRead()
+	{
+		FPSMoveHitchWatchdog watchdog(TEXT("FPSMoveRawControllerData_TLS::ComponentPostAndRead"), 500);
+		FScopeLock scopeLock(&ConcurrentData->Lock);
+
+		// Post the component thread's data to the worker thread's data
+		ConcurrentData->RumbleRequest = this->RumbleRequest;
+
+		// Read the worker thread's data into the component thread's data'
+        this->PSMovePosition = ConcurrentData->PSMovePosition;
+        this->PSMoveOrientation = ConcurrentData->PSMoveOrientation;
+		this->Buttons = ConcurrentData->Buttons;
+		this->TriggerValue = ConcurrentData->TriggerValue;
+		this->IsConnected = ConcurrentData->IsConnected;
+		this->IsTracking = ConcurrentData->IsTracking;
+        this->IsEnabled = ConcurrentData->IsEnabled;
+		this->SequenceNumber = ConcurrentData->SequenceNumber;
+	}
 
     void WorkerRead()
     {
@@ -326,63 +181,148 @@ struct FPSMoveRawControllerData_TLS : public FPSMoveRawControllerData_Base
     {
         FScopeLock scopeLock(&ConcurrentData->Lock);
 
+		// Since we just updated the controller data, bump the sequence data
+		this->SequenceNumber++;
+
         // Post the worker thread's data to the component thread's data
         ConcurrentData->PSMovePosition = this->PSMovePosition;
         ConcurrentData->PSMoveOrientation = this->PSMoveOrientation;
         ConcurrentData->Buttons = this->Buttons;
-        ConcurrentData->Pressed = this->Pressed;
-        ConcurrentData->Released = this->Released;
         ConcurrentData->TriggerValue = this->TriggerValue;
         ConcurrentData->IsConnected = this->IsConnected;
-        ConcurrentData->IsCalibrated = this->IsCalibrated;
         ConcurrentData->IsTracking = this->IsTracking;
         ConcurrentData->IsEnabled = this->IsEnabled;
-
-        // Switches to indicate whether or not the pose needs to be reset or the colour needs to be cycled.
-        ConcurrentData->ResetPoseRequest = this->ResetPoseRequest;
-        ConcurrentData->CycleColourRequest = this->CycleColourRequest;
+        ConcurrentData->SequenceNumber = this->SequenceNumber;
     }
 };
 
-USTRUCT()
-struct FPSMoveDataContext
+struct FPSMovePose
 {
-    GENERATED_USTRUCT_BODY();
-    
-    UPROPERTY()
-    int32 PSMoveID;
-    
-    FPSMoveRawSharedData_TLS RawSharedData;
-    FPSMoveRawControllerData_TLS RawControllerData;
-    
-    void ComponentRead()
+    FVector PSMPos;
+    FQuat PSMOri;
+    FQuat ZeroYaw;
+    FVector LastPosition;
+    FQuat LastOrientation;
+
+    void Clear()
     {
-        if (RawSharedData.IsValid())
-        {
-            RawSharedData.ComponentRead();
-        }
-        
-        if (RawControllerData.IsValid())
-        {
-            RawControllerData.ComponentRead();
-        }
+        PSMPos= FVector::ZeroVector;
+        PSMOri= FQuat::Identity;
+        ZeroYaw= FQuat::Identity;
+        LastPosition= FVector::ZeroVector;
+        LastOrientation= FQuat::Identity;
     }
 
+    void ResetYaw()
+    {
+        ZeroYaw = LastOrientation;
+        ZeroYaw.X = 0;
+        ZeroYaw.Y = 0;
+        ZeroYaw.Normalize();
+        ZeroYaw = ZeroYaw.Inverse();
+    }
+};
+
+struct FPSMoveDataContext
+{
+    int32 PSMoveID;
+    FPSMovePose Pose;
+	bool InputManagerHasProcessedEvents;
+
+    // Controller Data bound to data in the worker thread    
+    FPSMoveRawControllerData_TLS RawControllerData;
+
+    // Controller Data from previous frame
+	uint32 RawControllerPreviousButtons;
+    uint8 RawControllerPreviousTriggerValue;
+
+    FPSMoveDataContext()
+    {
+        Clear();
+    }
+
+    void Clear()
+    {
+        Pose.Clear();
+        PSMoveID = -1;
+        RawControllerData.ConcurrentData = nullptr;
+        RawControllerPreviousButtons = 0;
+        RawControllerPreviousTriggerValue = 0;
+        InputManagerHasProcessedEvents= true; // Nothing to process yet
+    } 
+    
     void ComponentPost()
     {
-        if (RawSharedData.IsValid())
-        {
-            RawSharedData.ComponentPost();
-        }
-
         if (RawControllerData.IsValid())
         {
             RawControllerData.ComponentPost();
         }
     }
 
+	void InputManagerPostAndRead()
+	{
+		if (RawControllerData.IsValid())
+		{
+			// Backup controller state from the previous frame that we want to compute deltas on
+			// before it gets stomped by InputManagerPostAndRead()
+			int32 PreviousSequenceNumber = RawControllerData.SequenceNumber;
+            int32 PreviousTriggerValue= RawControllerData.TriggerValue;
+			int32 PreviousButtons = RawControllerData.Buttons;
+
+			// If the worker thread updated the controller, the sequence number will change
+			RawControllerData.InputManagerPostAndRead();
+
+			// If the worker thread posted new data then the sequence number should changes
+			if (RawControllerData.SequenceNumber != PreviousSequenceNumber)
+			{
+				// Actually update the previous controller state when we get new data
+				RawControllerPreviousTriggerValue = PreviousTriggerValue;
+				RawControllerPreviousButtons = PreviousButtons;
+
+				// The input manager has new data to process
+				InputManagerHasProcessedEvents = false;
+			}
+		}
+	}
+
+	bool GetInputManagerHasProcessedEvents() const
+	{
+		return InputManagerHasProcessedEvents;
+	}
+
+	void MarkInputManagerHasProcessedEvents()
+	{
+		InputManagerHasProcessedEvents = true;
+	}
+
+    void SetRumbleRequest(uint8 RequestedRumbleValue)
+    {
+        if (RawControllerData.IsValid() && RawControllerData.IsConnected)
+        {
+            RawControllerData.RumbleRequest = RequestedRumbleValue;
+        }
+    }
+
+    void PostCycleColourRequest()
+    {
+        if (RawControllerData.IsValid() && RawControllerData.IsConnected)
+        {
+            RawControllerData.CycleColourRequest = true;
+            ComponentPost();
+        }
+    }
+
+    void PostResetPoseRequest()
+    {
+        if (RawControllerData.IsValid() && RawControllerData.IsConnected)
+        {
+            RawControllerData.ResetPoseRequest = true;
+            ComponentPost();
+        }
+    } 
+
     // Controller Data Functions
-    FVector GetPosition()
+    FVector GetPosition() const
     {
         if (RawControllerData.IsValid() && RawControllerData.IsConnected)
         {
@@ -392,7 +332,7 @@ struct FPSMoveDataContext
         }
     }
 
-    FQuat GetOrientation()
+    FQuat GetOrientation() const
     {
         if (RawControllerData.IsValid() && RawControllerData.IsConnected)
         {
@@ -403,12 +343,12 @@ struct FPSMoveDataContext
         }
     }
     
-    FRotator GetRotation()
+    FRotator GetRotation() const
     {
         return GetOrientation().Rotator();
     }
 
-    bool GetIsTracking()
+    bool GetIsTracking() const
     {
         if (RawControllerData.IsValid() && RawControllerData.IsConnected)
         {
@@ -419,7 +359,7 @@ struct FPSMoveDataContext
         }
     }
     
-    bool GetIsEnabled()
+    bool GetIsEnabled() const
     {
         if (RawControllerData.IsValid() && RawControllerData.IsConnected)
         {
@@ -430,7 +370,7 @@ struct FPSMoveDataContext
         }
     }
     
-    bool GetButtonTriangle()
+    bool GetButtonTriangle() const
     {
         if (RawControllerData.IsValid() && RawControllerData.IsConnected)
         {
@@ -440,7 +380,7 @@ struct FPSMoveDataContext
         }
     }
     
-    bool GetButtonCircle()
+    bool GetButtonCircle() const
     {
         if (RawControllerData.IsValid() && RawControllerData.IsConnected)
         {
@@ -450,7 +390,7 @@ struct FPSMoveDataContext
         }
     }
     
-    bool GetButtonCross()
+    bool GetButtonCross() const
     {
         if (RawControllerData.IsValid() && RawControllerData.IsConnected)
         {
@@ -460,7 +400,7 @@ struct FPSMoveDataContext
         }
     }
     
-    bool GetButtonSquare()
+    bool GetButtonSquare() const
     {
         if (RawControllerData.IsValid() && RawControllerData.IsConnected)
         {
@@ -470,7 +410,7 @@ struct FPSMoveDataContext
         }
     }
     
-    bool GetButtonSelect()
+    bool GetButtonSelect() const
     {
         if (RawControllerData.IsValid() && RawControllerData.IsConnected)
         {
@@ -480,7 +420,7 @@ struct FPSMoveDataContext
         }
     }
     
-    bool GetButtonStart()
+    bool GetButtonStart() const
     {
         if (RawControllerData.IsValid() && RawControllerData.IsConnected)
         {
@@ -490,7 +430,7 @@ struct FPSMoveDataContext
         }
     }
     
-    bool GetButtonPS()
+    bool GetButtonPS() const
     {
         if (RawControllerData.IsValid() && RawControllerData.IsConnected)
         {
@@ -500,7 +440,7 @@ struct FPSMoveDataContext
         }
     }
     
-    bool GetButtonMove()
+    bool GetButtonMove() const
     {
         if (RawControllerData.IsValid() && RawControllerData.IsConnected)
         {
@@ -509,8 +449,13 @@ struct FPSMoveDataContext
             return 0;
         }
     }
+
+	uint8 GetPreviousTriggerValue() const
+	{
+		return RawControllerPreviousTriggerValue;
+	}
     
-    uint8 GetTriggerValue()
+    uint8 GetTriggerValue() const
     {
         if (RawControllerData.IsValid() && RawControllerData.IsConnected)
         {
@@ -519,51 +464,126 @@ struct FPSMoveDataContext
             return 0;
         }
     }
+
+	// Pressed This Frame
+	bool GetButtonPressedThisFrame(PSMove_Button ButtonMask) const
+	{
+		bool PressedThisFrame = false;
+
+		if (RawControllerData.IsValid() && RawControllerData.IsConnected)
+		{
+			PressedThisFrame =
+				(RawControllerPreviousButtons & ButtonMask) == 0 &&
+				(RawControllerData.Buttons & ButtonMask) != 0;
+		}
+
+		return PressedThisFrame;
+	}
+
+    bool GetButtonTrianglePressed() const
+    {
+		return GetButtonPressedThisFrame(PSMove_Button::Btn_TRIANGLE);
+    }
     
-    void SetRumbleRequest(uint8 RequestedRumbleValue)
+    bool GetButtonCirclePressed() const
     {
-        if (RawControllerData.IsValid() && RawControllerData.IsConnected)
-        {
-            RawControllerData.RumbleRequest = RequestedRumbleValue;
-        }
+		return GetButtonPressedThisFrame(PSMove_Button::Btn_CIRCLE);
+    }
+    
+    bool GetButtonCrossPressed() const
+    {
+		return GetButtonPressedThisFrame(PSMove_Button::Btn_CROSS);
+    }
+    
+    bool GetButtonSquarePressed() const
+    {
+		return GetButtonPressedThisFrame(PSMove_Button::Btn_SQUARE);
+    }
+    
+    bool GetButtonSelectPressed() const
+    {
+		return GetButtonPressedThisFrame(PSMove_Button::Btn_SELECT);
+    }
+    
+    bool GetButtonStartPressed() const
+    {
+		return GetButtonPressedThisFrame(PSMove_Button::Btn_START);
+    }
+    
+    bool GetButtonPSPressed() const
+    {
+		return GetButtonPressedThisFrame(PSMove_Button::Btn_PS);
+    }
+    
+    bool GetButtonMovePressed() const
+    {
+		return GetButtonPressedThisFrame(PSMove_Button::Btn_MOVE);
     }
 
-    void SetCycleColourRequest(bool AskForColourCycle)
+	bool GetButtonTriggerPressed() const
+	{
+		return GetButtonPressedThisFrame(PSMove_Button::Btn_T);
+	}
+
+	// Released This Frame
+	bool GetButtonReleasedThisFrame(PSMove_Button ButtonMask) const
+	{
+		bool ReleasedThisFrame = false;
+
+		if (RawControllerData.IsValid() && RawControllerData.IsConnected)
+		{
+			ReleasedThisFrame =
+				(RawControllerPreviousButtons & ButtonMask) != 0 &&
+				(RawControllerData.Buttons & ButtonMask) == 0;
+		}
+
+		return ReleasedThisFrame;
+	}
+
+    bool GetButtonTriangleReleased() const
     {
-        if (RawControllerData.IsValid() &&
-            RawControllerData.IsConnected)
-        {
-            RawControllerData.CycleColourRequest = AskForColourCycle;
-        }
-        else
-        {
-            RawControllerData.CycleColourRequest = false;
-        }
+		return GetButtonReleasedThisFrame(PSMove_Button::Btn_TRIANGLE);
+    }
+    
+    bool GetButtonCircleReleased() const
+    {
+		return GetButtonReleasedThisFrame(PSMove_Button::Btn_CIRCLE);
+    }
+    
+    bool GetButtonCrossReleased() const
+    {
+		return GetButtonReleasedThisFrame(PSMove_Button::Btn_CROSS);
+    }
+    
+    bool GetButtonSquareReleased() const
+    {
+		return GetButtonReleasedThisFrame(PSMove_Button::Btn_SQUARE);
+    }
+    
+    bool GetButtonSelectReleased() const
+    {
+		return GetButtonReleasedThisFrame(PSMove_Button::Btn_SELECT);
+    }
+    
+    bool GetButtonStartReleased() const
+    {
+		return GetButtonReleasedThisFrame(PSMove_Button::Btn_START);
+    }
+    
+    bool GetButtonPSReleased() const
+    {
+		return GetButtonReleasedThisFrame(PSMove_Button::Btn_PS);
+    }
+    
+    bool GetButtonMoveReleased() const
+    {
+		return GetButtonReleasedThisFrame(PSMove_Button::Btn_MOVE);
     }
 
-    void SetResetPoseRequest(bool AskForPoseReset)
-    {
-        if (RawControllerData.IsValid() &&
-            RawControllerData.IsConnected)
-        {
-            RawControllerData.ResetPoseRequest = AskForPoseReset;
-        }
-        else {
-            RawControllerData.ResetPoseRequest = false;
-        }
-    }
-
-    FPSMoveDataContext()
-    {
-        Clear();
-    }
-
-    void Clear()
-    {
-        PSMoveID = -1;
-        RawControllerData.ConcurrentData = nullptr;
-        RawSharedData.ConcurrentData = nullptr;
-    }    
+	bool GetButtonTriggerReleased() const
+	{
+		return GetButtonReleasedThisFrame(PSMove_Button::Btn_T);
+	}  
 };
 
 UCLASS()
