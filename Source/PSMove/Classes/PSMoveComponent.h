@@ -33,6 +33,12 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = PSMove)
 	bool ApplyTransformToActor;
     
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Debug)
+    bool bShowHMDFrustumDebug;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Debug)
+    bool bShowTrackingDebug;
+
     UFUNCTION(BlueprintCallable, Category = PSMove)
     void ResetPose();
 

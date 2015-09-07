@@ -8,12 +8,33 @@
 #include "IInputDevice.h"
 #include "IHeadMountedDisplay.h"
 
+// Work in progress pose update method
+#define USE_NEW_POSE_UPDATE
+
 //-- pre-declarations -----
 class FPSMoveInputManager;
 class FPSMoveInternal;
 
 //-- prototypes -----
+static bool ComputeTrackingCameraFrustum(
+    const int32 PlayerIndex,
+    FTransform &TrackingSpaceToWorldSpace,
+    float *TrackingCameraNearPlane = nullptr, 
+    float *TrackingCameraFarPlane = nullptr, 
+    float *TrackingCameraHHalfRadians = nullptr, 
+    float *TrackingCameraVHalfRadians = nullptr);
 static void DataContextPoseUpdate(const int32 PlayerIndex, FPSMoveDataContext *DataContext);
+static void DrawHMDTrackingFrustum();
+static void DrawPSMoveTrackingDebug(FPSMoveDataContext *DataContext);
+static void DrawDK2TrackingCameraFrustum(
+    UWorld* World, 
+    const FTransform& Transform, 
+    const float NearLength, 
+    const float FarLength, 
+    const float HalfHorizontalRadians, 
+    const float HalfVerticalRadians, 
+    const FColor &Color);
+static void DrawBasis(UWorld* World, const FTransform& Transform, const float Size);
 
 //-- declarations -----
 /**
@@ -36,6 +57,8 @@ public:
 	{
 		GEngine->MotionControllerDevices.Remove(this);
 	}
+
+    void DrawDebug();
 
 	/**
 	* IInputDevice
@@ -103,7 +126,6 @@ public:
 
 	int32 GetDataContextCount();
 	FPSMoveDataContext *GetDataContextByIndex(const int32 DataContextIndex);
-    FPSMovePose *GetDataContextPoseByIndex(const int32 DataContextIndex);
 
 	static void DataContextIndexToPlayerHand(const int DataContextIndex, int32 &OutPlayerIndex, EControllerHand &OutHand);
 	static int32 PlayerHandToDataContextIndex(const int32 PlayerIndex, const EControllerHand Hand);
@@ -111,7 +133,6 @@ public:
 private:
 	// Controller states
 	FPSMoveDataContext ControllerDataContexts[MaxControllers];
-    FPSMovePose ControllerPoses[MaxControllers];
 };
 
 IMPLEMENT_MODULE(FPSMoveInternal, PSMove)
@@ -205,11 +226,6 @@ FPSMoveDataContext *FPSMoveInternal::GetDataContextByIndex(const int32 DataConte
 	return &ControllerDataContexts[DataContextIndex];
 }
 
-FPSMovePose *FPSMoveInternal::GetDataContextPoseByIndex(const int32 DataContextIndex)
-{
-	return &ControllerPoses[DataContextIndex];
-}
-
 void FPSMoveInternal::DataContextIndexToPlayerHand(const int DataContextIndex, int32 &OutPlayerIndex, EControllerHand &OutHand)
 {
 	verify(DataContextIndex < MaxControllers);
@@ -241,13 +257,38 @@ void FPSMoveInputManager::Tick(float DeltaTime)
         // Update the pose for the controller
         if (DataContext->GetIsEnabled())
         {
-            FPSMovePose *Pose= PSMovePlugin->GetDataContextPoseByIndex(DataContextIndex);
-
             int32 PlayerIndex;
             EControllerHand Hand;
             FPSMoveInternal::DataContextIndexToPlayerHand(DataContextIndex, PlayerIndex, Hand);
 
             DataContextPoseUpdate(PlayerIndex, DataContext);
+        }
+    }
+
+    // Debug Rendering
+    DrawDebug();
+}
+
+void FPSMoveInputManager::DrawDebug()
+{    
+    bool HasDrawnFrustum= false;
+
+	for (int32 DataContextIndex = 0; DataContextIndex < PSMovePlugin->GetDataContextCount(); ++DataContextIndex)
+	{
+		FPSMoveDataContext *DataContext = PSMovePlugin->GetDataContextByIndex(DataContextIndex);
+
+        if (DataContext->GetIsEnabled())
+        {
+            if (DataContext->ShowHMDFrustumDebug && !HasDrawnFrustum)
+            {
+                DrawHMDTrackingFrustum();
+                HasDrawnFrustum= true;
+            }
+
+            if (DataContext->ShowTrackingDebug)
+            {
+                DrawPSMoveTrackingDebug(DataContext);
+            }
         }
     }
 }
@@ -414,10 +455,10 @@ bool FPSMoveInputManager::GetControllerOrientationAndPosition(
 
 	if (ControllerDataContext != nullptr && ControllerDataContext->GetIsEnabled())
 	{
-        const FPSMovePose *ControllerPose= PSMovePlugin->GetDataContextPoseByIndex(DataContextIndex);
+        const FPSMoveDataContext *DataContext= PSMovePlugin->GetDataContextByIndex(DataContextIndex);
 
-        OutOrientation= FRotator(ControllerPose->PSMOri);
-        OutPosition= ControllerPose->PSMPos;
+        OutOrientation= FRotator(DataContext->Pose.WorldOrientation);
+        OutPosition= DataContext->Pose.WorldPosition;
 
 		RetVal = true;
 	}
@@ -500,13 +541,42 @@ FGamepadKeyNames::Type FPSMoveInputManager::GetButtonName(PSMove_Button Button, 
 }
 
 //-- Helper Functions -----------------------
+#ifdef USE_NEW_POSE_UPDATE
 static void DataContextPoseUpdate(const int32 PlayerIndex, FPSMoveDataContext *DataContext)
 {
-    FPSMovePose *Pose = &DataContext->Pose;
+    FTransform TrackingSpaceToWorldSpace;
 
-    // Get the raw PSMove position and quaternion
-    Pose->PSMPos = DataContext->GetPosition();
-    Pose->PSMOri = DataContext->GetOrientation();
+    if (ComputeTrackingCameraFrustum(PlayerIndex, TrackingSpaceToWorldSpace))
+    {
+        ULocalPlayer* LocalPlayer = GEngine->FindFirstLocalPlayerFromControllerId(PlayerIndex);
+
+        // The PSMove position is given in the space of the rift camera in centimeters
+        float CentimetersToUnrealUnits= UHeadMountedDisplayFunctionLibrary::GetWorldToMetersScale(LocalPlayer) / 100.f;
+        FVector PSMPosTrackingSpace= DataContext->GetPosition() * CentimetersToUnrealUnits;
+        FVector PSMPosWorldSpace= TrackingSpaceToWorldSpace.TransformPosition(PSMPosTrackingSpace);
+
+        // Transform PSMove pose from HMD_native in HMD_CS to HMD_native in UE4_CS
+        // Currently Oculus-specific.
+        FQuat PSMOriNative = DataContext->GetOrientation();
+        FQuat PSMOriWorld = FQuat(PSMOriNative.Y, PSMOriNative.X, PSMOriNative.Z, -PSMOriNative.W);        
+
+        // Save the resulting pose
+        FPSMovePose *Pose = &DataContext->Pose;
+
+        Pose->LastWorldPosition = Pose->WorldPosition;
+        Pose->LastWorldOrientation = Pose->WorldOrientation;
+
+        Pose->WorldPosition = PSMPosWorldSpace;
+        Pose->WorldOrientation = Pose->ZeroYaw * PSMOriWorld;
+    }
+}
+
+#else
+static void DataContextPoseUpdate(const int32 PlayerIndex, FPSMoveDataContext *DataContext)
+{
+    // Get the PSMove position and quaternion in the space of the DK2 tracking camera in cm
+    FVector PSMPos = DataContext->GetPosition();
+    FQuat PSMOri = DataContext->GetOrientation();
 
     /*
     There are several steps needed to go from the PSMove reference frame to the game world reference frame.
@@ -561,22 +631,22 @@ static void DataContextPoseUpdate(const int32 PlayerIndex, FPSMoveDataContext *D
         CamOrientation = FQuat(CamOrientation.Y, CamOrientation.Z, -CamOrientation.X, -CamOrientation.W);  // Convert to native HMD coordinate system
 
         // Transform the PSMove pose through the camera from HMD_camera in HMD_CS to HMD_native in HMD_CS
-        Pose->PSMPos = CamOrientation.RotateVector(Pose->PSMPos);
-        Pose->PSMPos += CamOrigin;
-        Pose->PSMOri = CamOrientation * Pose->PSMOri;
+        PSMPos = CamOrientation.RotateVector(PSMPos);
+        PSMPos += CamOrigin;
+        PSMOri = CamOrientation * PSMOri;
 
         // Transform PSMove pose from HMD_native in HMD_CS to HMD_native in UE4_CS
         // Currently Oculus-specific.
-        Pose->PSMOri = FQuat(Pose->PSMOri.Y, Pose->PSMOri.X, Pose->PSMOri.Z, -Pose->PSMOri.W);
+        PSMOri = FQuat(PSMOri.Y, PSMOri.X, PSMOri.Z, -PSMOri.W);
         // TODO: units m->cm unnecessary because physical_transform was kept in cm.
-        Pose->PSMPos = FVector(-Pose->PSMPos.Z, Pose->PSMPos.X, Pose->PSMPos.Y);
+        PSMPos = FVector(-PSMPos.Z, PSMPos.X, PSMPos.Y);
 
         // Transform PSMove pose from HMD_native in UE4_CS to HMD_UE4 in UE4_CS
-        Pose->PSMPos -= HMDOrigin;
-        Pose->PSMPos *= CameraScale3D;
-        Pose->PSMPos = HMDZeroYaw.Inverse().RotateVector(Pose->PSMPos);
-        Pose->PSMOri = HMDZeroYaw.Inverse() * Pose->PSMOri;
-        Pose->PSMOri.Normalize();
+        PSMPos -= HMDOrigin;
+        PSMPos *= CameraScale3D;
+        PSMPos = HMDZeroYaw.Inverse().RotateVector(PSMPos);
+        PSMOri = HMDZeroYaw.Inverse() * PSMOri;
+        PSMOri.Normalize();
         // TODO: PSMPos += frame->Settings->PositionOffset // Source says this is deprecated.
     }
     else
@@ -585,8 +655,8 @@ static void DataContextPoseUpdate(const int32 PlayerIndex, FPSMoveDataContext *D
         If we are not using an HMD then assume that the PSMove coordinates being returned are in their native space.
         */
         // Transform from PSEye coordinate system to UE4 coordinate system
-        Pose->PSMOri = FQuat(Pose->PSMOri.Y, Pose->PSMOri.X, Pose->PSMOri.Z, -Pose->PSMOri.W);
-        Pose->PSMPos = FVector(-Pose->PSMPos.Z, Pose->PSMPos.X, Pose->PSMPos.Y);
+        PSMOri = FQuat(PSMOri.Y, PSMOri.X, PSMOri.Z, -PSMOri.W);
+        PSMPos = FVector(-PSMPos.Z, PSMPos.X, PSMPos.Y);
     }
 
     // Get the CameraManager
@@ -605,7 +675,7 @@ static void DataContextPoseUpdate(const int32 PlayerIndex, FPSMoveDataContext *D
         // If using an HMD, it is necessary to undo the transformation done to the camera by the HMD.
         // See here: https://github.com/EpicGames/UnrealEngine/blob/master/Engine/Plugins/Runtime/GearVR/Source/GearVR/Private/HeadMountedDisplayCommon.cpp#L989
             
-        // Get the HMD pose
+        // Get the HMD pose in UE4 CS (in UU)
         FVector HeadPosition;
         FQuat HeadOrient;
         GEngine->HMDDevice->GetCurrentOrientationAndPosition(HeadOrient, HeadPosition);
@@ -616,13 +686,217 @@ static void DataContextPoseUpdate(const int32 PlayerIndex, FPSMoveDataContext *D
     }
         
     // Transform the PSMove through the camera
-    Pose->PSMOri = DeltaControlOrientation * Pose->PSMOri;
-    Pose->PSMPos = DeltaControlOrientation.RotateVector(Pose->PSMPos);
+    PSMOri = DeltaControlOrientation * PSMOri;
+    PSMPos = DeltaControlOrientation.RotateVector(PSMPos);
+    PSMPos += CameraManagerTransform.GetLocation();
 
-    Pose->PSMPos += CameraManagerTransform.GetLocation();
+    // Save the resulting pose
+    {
+        FPSMovePose *Pose = &DataContext->Pose;
 
-    Pose->LastPosition = Pose->PSMPos;
-    Pose->LastOrientation = Pose->PSMOri;
+        Pose->LastWorldPosition = Pose->WorldPosition;
+        Pose->LastWorldOrientation = Pose->WorldOrientation;
 
-    Pose->PSMOri = Pose->ZeroYaw * Pose->PSMOri;
+        Pose->WorldPosition = PSMPos;
+        Pose->WorldOrientation = Pose->ZeroYaw * PSMOri;
+    }
+}
+#endif
+
+static FTransform RiftToUnrealCoordinateSystemTransform()
+{
+    // Rift Coordinate System -> Unreal Coordinate system ==> (x, y, z) -> (-z, x, y)
+    // This tranform is equivalent to Scale_z(-1)*Rot_y(90)*Rot_x(90)
+    return FTransform(FMatrix(FVector(0, 1, 0), FVector(0, 0, 1), FVector(-1, 0, 0), FVector::ZeroVector));
+}
+
+static bool ComputeTrackingCameraFrustum(
+    const int32 PlayerIndex,
+    FTransform &TrackingSpaceToWorldSpace, // In Unreal Units
+    float *OutTrackingCameraNearPlane, // In Unreal Units
+    float *OutTrackingCameraFarPlane, // In Unreal Units
+    float *OutTrackingCameraHHalfRadians, 
+    float *OutTrackingCameraVHalfRadians)
+{
+    bool success= false;
+
+    // Get the CameraManager for the primary player
+    ULocalPlayer* LocalPlayer = GEngine->FindFirstLocalPlayerFromControllerId(PlayerIndex);
+    APlayerCameraManager* GameCameraManager = UGameplayStatics::GetPlayerCameraManager(LocalPlayer, PlayerIndex);
+    
+
+    if (GameCameraManager != nullptr)
+    {
+        FTransform RiftToUnrealCS= RiftToUnrealCoordinateSystemTransform();
+
+        // Get the world game camera transform for the player
+        FQuat GameCameraOrientation= GameCameraManager->GetCameraRotation().Quaternion();
+        FVector GameCameraLocation= GameCameraManager->GetCameraLocation();
+
+        // Get the HMD pose in UE4 Coordinate System (in Unreal Units)
+        FVector HMDPosition;
+        FQuat HMDOrientation;
+        GEngine->HMDDevice->GetCurrentOrientationAndPosition(HMDOrientation, HMDPosition);
+
+        // Get the camera pose in HMD_UE4 in UE4_CS. This transforms from HMD_camera to HMD_native
+        FVector TrackingCameraOrigin;
+        FQuat TrackingCameraOrientation;
+        float TrackingCameraHFOVDegrees;
+        float TrackingCameraVFOVDegrees;
+        float TrackingCameraDefaultDistance;
+        float TrackingCameraNearPlane;
+        float TrackingCameraFarPlane;
+        GEngine->HMDDevice->GetPositionalTrackingCameraProperties(
+            TrackingCameraOrigin, TrackingCameraOrientation, 
+            TrackingCameraHFOVDegrees, TrackingCameraVFOVDegrees, 
+            TrackingCameraDefaultDistance, 
+            TrackingCameraNearPlane, TrackingCameraFarPlane);   
+
+        // HMDToGameCameraRotation = Undo HMD orientation THEN apply game camera orientation
+        FQuat HMDToGameCameraRotation= GameCameraOrientation * HMDOrientation.Inverse();
+        FQuat TrackingCameraToGameRotation= HMDToGameCameraRotation * TrackingCameraOrientation;
+
+        // Compute the tracking camera location in world space
+        FVector TrackingCameraWorldSpaceOrigin=
+            HMDToGameCameraRotation.RotateVector(TrackingCameraOrigin) + GameCameraLocation;
+
+        // Optional tracking frustum properties
+        if (OutTrackingCameraNearPlane != nullptr)
+        {
+            *OutTrackingCameraNearPlane= TrackingCameraNearPlane;
+        }
+
+        if (OutTrackingCameraFarPlane != nullptr)
+        {
+            *OutTrackingCameraFarPlane= TrackingCameraFarPlane;
+        }
+
+        if (OutTrackingCameraHHalfRadians != nullptr)
+        {
+            *OutTrackingCameraHHalfRadians= FMath::DegreesToRadians(TrackingCameraHFOVDegrees/2.f);
+        }
+
+        if (OutTrackingCameraVHalfRadians != nullptr)
+        {
+            *OutTrackingCameraVHalfRadians= FMath::DegreesToRadians(TrackingCameraVFOVDegrees/2.f);
+        }
+
+        // Compute the Transform to go from Rift Tracking Space (in unreal units) to World Tracking Space (in unreal units)
+        TrackingSpaceToWorldSpace= 
+            RiftToUnrealCS * FTransform(TrackingCameraToGameRotation, TrackingCameraWorldSpaceOrigin);
+
+        success= true;
+    }
+
+    return success;
+}
+
+static void DrawHMDTrackingFrustum()
+{
+    const int32 PlayerIndex= 0;
+    FTransform TrackingSpaceToWorldSpace;
+    float TrackingCameraNearPlane; 
+    float TrackingCameraFarPlane; 
+    float TrackingCameraHHalfRadians;
+    float TrackingCameraVHalfRadians;
+
+    if (ComputeTrackingCameraFrustum(
+            PlayerIndex,
+            TrackingSpaceToWorldSpace,
+            &TrackingCameraNearPlane, 
+            &TrackingCameraFarPlane, 
+            &TrackingCameraHHalfRadians, 
+            &TrackingCameraVHalfRadians))
+    {
+        ULocalPlayer* LocalPlayer = GEngine->FindFirstLocalPlayerFromControllerId(PlayerIndex);
+
+        DrawDK2TrackingCameraFrustum(
+            LocalPlayer->GetWorld(), 
+            TrackingSpaceToWorldSpace, 
+            TrackingCameraNearPlane, 
+            TrackingCameraFarPlane, 
+            TrackingCameraHHalfRadians, 
+            TrackingCameraVHalfRadians, 
+            FColor::Yellow);
+        DrawBasis(LocalPlayer->GetWorld(), TrackingSpaceToWorldSpace, 50.f);
+    }
+}
+
+static void DrawPSMoveTrackingDebug(FPSMoveDataContext *DataContext)
+{
+    const int32 PlayerIndex= 0;
+    FTransform TrackingSpaceToWorldSpace;
+
+    if (ComputeTrackingCameraFrustum(PlayerIndex, TrackingSpaceToWorldSpace))
+    {
+        ULocalPlayer* LocalPlayer = GEngine->FindFirstLocalPlayerFromControllerId(PlayerIndex);
+
+        // The PSMove position is given in the space of the rift camera in centimeters
+        float CentimetersToUnrealUnits= UHeadMountedDisplayFunctionLibrary::GetWorldToMetersScale(LocalPlayer) / 100.f;
+        FVector PSMoveInRiftTrackingSpace= DataContext->GetPosition() * CentimetersToUnrealUnits;
+        FVector PSMoveInWorldSpace= TrackingSpaceToWorldSpace.TransformPosition(PSMoveInRiftTrackingSpace);
+
+        DrawDebugSphere(LocalPlayer->GetWorld(), PSMoveInWorldSpace, 3.f, 15, FColor::White);
+    }
+}
+
+static void DrawBasis(
+    UWorld* World, 
+    const FTransform& Transform,
+    const float Size)
+{
+    FVector Origin= Transform.GetLocation();
+    FVector XEndPoint= Transform.TransformPosition(FVector(Size, 0, 0));
+    FVector YEndPoint= Transform.TransformPosition(FVector(0, Size, 0));
+    FVector ZEndPoint= Transform.TransformPosition(FVector(0, 0, Size));
+
+    DrawDebugLine(World, Origin, XEndPoint, FColor::Red);
+    DrawDebugLine(World, Origin, YEndPoint, FColor::Green);
+    DrawDebugLine(World, Origin, ZEndPoint, FColor::Blue);
+}
+
+static void DrawDK2TrackingCameraFrustum(
+    UWorld* World, 
+    const FTransform& TrackingToWorldTransform, 
+    const float NearLength, 
+    const float FarLength, 
+    const float HalfHorizontalRadians, 
+    const float HalfVerticalRadians, 
+    const FColor &Color)
+{
+    const float HorizontalRatio= FMath::Tan(HalfHorizontalRadians);
+    const float VerticalRatio= FMath::Tan(HalfVerticalRadians);
+
+	const float HalfNearWidth = NearLength * HorizontalRatio;
+	const float HalfNearHeight = NearLength * VerticalRatio;
+
+	const float HalfFarWidth = FarLength * HorizontalRatio;
+	const float HalfFarHeight = FarLength * VerticalRatio;
+
+	const FVector Origin = TrackingToWorldTransform.GetLocation();
+
+	const FVector NearV0 = TrackingToWorldTransform.TransformPosition(FVector(HalfNearWidth, HalfNearHeight, NearLength));
+	const FVector NearV1 = TrackingToWorldTransform.TransformPosition(FVector(-HalfNearWidth, HalfNearHeight, NearLength));
+	const FVector NearV2 = TrackingToWorldTransform.TransformPosition(FVector(-HalfNearWidth, -HalfNearHeight, NearLength));
+	const FVector NearV3 = TrackingToWorldTransform.TransformPosition(FVector(HalfNearWidth, -HalfNearHeight, NearLength));
+
+	const FVector FarV0 = TrackingToWorldTransform.TransformPosition(FVector(HalfFarWidth, HalfFarHeight, FarLength));
+	const FVector FarV1 = TrackingToWorldTransform.TransformPosition(FVector(-HalfFarWidth, HalfFarHeight, FarLength));
+	const FVector FarV2 = TrackingToWorldTransform.TransformPosition(FVector(-HalfFarWidth, -HalfFarHeight, FarLength));
+	const FVector FarV3 = TrackingToWorldTransform.TransformPosition(FVector(HalfFarWidth, -HalfFarHeight, FarLength));
+
+	DrawDebugLine(World, Origin, FarV0, Color);
+	DrawDebugLine(World, Origin, FarV1, Color);
+	DrawDebugLine(World, Origin, FarV2, Color);
+	DrawDebugLine(World, Origin, FarV3, Color);
+
+	DrawDebugLine(World, NearV0, NearV1, Color);
+	DrawDebugLine(World, NearV1, NearV2, Color);
+	DrawDebugLine(World, NearV2, NearV3, Color);
+	DrawDebugLine(World, NearV3, NearV0, Color);
+
+	DrawDebugLine(World, FarV0, FarV1, Color);
+	DrawDebugLine(World, FarV1, FarV2, Color);
+	DrawDebugLine(World, FarV2, FarV3, Color);
+	DrawDebugLine(World, FarV3, FarV0, Color);
 }

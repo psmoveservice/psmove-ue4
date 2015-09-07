@@ -245,14 +245,14 @@ uint32 FPSMoveWorker::Run()
                             UE_LOG(LogPSMove, Log, TEXT("FPSMoveWorker:: CYCLE COLOUR"));
                             psmove_tracker_cycle_color(Context.PSMoveTracker, Context.PSMoves[psmove_id]);
                             localControllerData.CycleColourRequest = false;
-                             }
+                        }
 
                         // Publish the worker data to the component. e.g., Position, Orientation, Buttons
                         // This also publishes updated ResetPoseRequest and CycleColourRequest.
                         localControllerData.WorkerPost();
-                             }
-                        }
                     }
+                }
+            }
             
             // Update the clock. This is left in here from old code in case we need a clock in the future (e.g., prediction)
             {

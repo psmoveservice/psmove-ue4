@@ -21,7 +21,19 @@ void UPSMoveComponent::BeginPlay()
     if (FPSMove::IsAvailable())
     {
         // Bind the data context to the concurrent controller data in the worker thread
-        if (!FPSMove::Get().AcquirePSMove(this->PlayerIndex, this->Hand, &this->DataContextPtr))
+        if (FPSMove::Get().AcquirePSMove(this->PlayerIndex, this->Hand, &this->DataContextPtr))
+        {
+            if (bShowHMDFrustumDebug)
+            {
+                this->DataContextPtr->SetShowHMDFrustumDebug(true);
+            }
+
+            if (bShowTrackingDebug)
+            {
+                this->DataContextPtr->SetShowTrackingDebug(true);
+            }
+        }
+        else
         {
             UE_LOG(LogPSMove, Error, TEXT("Failed to acquire PSMove controller %d/%d,"), this->PlayerIndex, (int32)this->Hand.GetValue());
         }
@@ -49,8 +61,8 @@ void UPSMoveComponent::TickComponent( float DeltaTime, ELevelTick TickType, FAct
 	{
         if (this->DataContextPtr != nullptr)
         {
-			FRotator Orientation= FRotator(this->DataContextPtr->Pose.PSMOri);
-			FVector Position= this->DataContextPtr->Pose.PSMPos;
+			FRotator Orientation= FRotator(this->DataContextPtr->Pose.WorldOrientation);
+			FVector Position= this->DataContextPtr->Pose.WorldPosition;
 
 			GetOwner()->SetActorLocationAndRotation(Position, Orientation);
         }

@@ -198,24 +198,24 @@ struct FPSMoveRawControllerData_TLS : public FPSMoveRawControllerData_Base
 
 struct FPSMovePose
 {
-    FVector PSMPos;
-    FQuat PSMOri;
+    FVector WorldPosition;
+    FQuat WorldOrientation;
     FQuat ZeroYaw;
-    FVector LastPosition;
-    FQuat LastOrientation;
+    FVector LastWorldPosition;
+    FQuat LastWorldOrientation;
 
     void Clear()
     {
-        PSMPos= FVector::ZeroVector;
-        PSMOri= FQuat::Identity;
+        WorldPosition= FVector::ZeroVector;
+        WorldOrientation= FQuat::Identity;
         ZeroYaw= FQuat::Identity;
-        LastPosition= FVector::ZeroVector;
-        LastOrientation= FQuat::Identity;
+        LastWorldPosition= FVector::ZeroVector;
+        LastWorldOrientation= FQuat::Identity;
     }
 
     void ResetYaw()
     {
-        ZeroYaw = LastOrientation;
+        ZeroYaw = LastWorldOrientation;
         ZeroYaw.X = 0;
         ZeroYaw.Y = 0;
         ZeroYaw.Normalize();
@@ -236,6 +236,10 @@ struct FPSMoveDataContext
 	uint32 RawControllerPreviousButtons;
     uint8 RawControllerPreviousTriggerValue;
 
+    // Debug
+    bool ShowHMDFrustumDebug;
+    bool ShowTrackingDebug;
+
     FPSMoveDataContext()
     {
         Clear();
@@ -249,6 +253,8 @@ struct FPSMoveDataContext
         RawControllerPreviousButtons = 0;
         RawControllerPreviousTriggerValue = 0;
         InputManagerHasProcessedEvents= true; // Nothing to process yet
+        ShowHMDFrustumDebug= false;
+        ShowTrackingDebug= false;
     } 
     
     void ComponentPost()
@@ -320,6 +326,16 @@ struct FPSMoveDataContext
             ComponentPost();
         }
     } 
+
+    void SetShowHMDFrustumDebug(bool flag)
+    {
+        ShowHMDFrustumDebug= flag;
+    }
+
+    void SetShowTrackingDebug(bool flag)
+    {
+        ShowTrackingDebug= flag;
+    }
 
     // Controller Data Functions
     FVector GetPosition() const
