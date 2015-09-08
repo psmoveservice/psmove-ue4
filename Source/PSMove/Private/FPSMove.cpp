@@ -563,10 +563,9 @@ static void DataContextPoseUpdate(const int32 PlayerIndex, FPSMoveDataContext *D
         // Save the resulting pose
         FPSMovePose *Pose = &DataContext->Pose;
 
-        Pose->LastWorldPosition = Pose->WorldPosition;
-        Pose->LastWorldOrientation = Pose->WorldOrientation;
-
         Pose->WorldPosition = PSMPosWorldSpace;
+
+        Pose->UncorrectedWorldOrientation = PSMOriWorld;
         Pose->WorldOrientation = Pose->ZeroYaw * PSMOriWorld;
     }
 }
@@ -694,10 +693,9 @@ static void DataContextPoseUpdate(const int32 PlayerIndex, FPSMoveDataContext *D
     {
         FPSMovePose *Pose = &DataContext->Pose;
 
-        Pose->LastWorldPosition = Pose->WorldPosition;
-        Pose->LastWorldOrientation = Pose->WorldOrientation;
-
         Pose->WorldPosition = PSMPos;
+
+        Pose->UncorrectedWorldOrientation = PSMOri;
         Pose->WorldOrientation = Pose->ZeroYaw * PSMOri;
     }
 }

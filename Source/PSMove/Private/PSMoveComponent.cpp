@@ -3,14 +3,13 @@
 #include "FPSMove.h"
 #include "Runtime/HeadMountedDisplay/Public/HeadMountedDisplay.h"
 
-UPSMoveComponent::UPSMoveComponent(const FObjectInitializer &init) : 
-    DataContextPtr(nullptr)
+UPSMoveComponent::UPSMoveComponent(const FObjectInitializer &init) : Super(init)
 {
+    DataContextPtr= nullptr;
     bWantsInitializeComponent = true;
     PrimaryComponentTick.bCanEverTick = true;
 	PlayerIndex = 0;
 	Hand = EControllerHand::Right;
-	ApplyTransformToActor = false;
 }
 
 // Called when the game starts
@@ -51,29 +50,11 @@ void UPSMoveComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
     }
 }
 
-// Called every frame
-void UPSMoveComponent::TickComponent( float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction )
-{
-    Super::TickComponent( DeltaTime, TickType, ThisTickFunction );
-
-	// Optionally update the parent actor position
-	if (ApplyTransformToActor)
-	{
-        if (this->DataContextPtr != nullptr)
-        {
-			FRotator Orientation= FRotator(this->DataContextPtr->Pose.WorldOrientation);
-			FVector Position= this->DataContextPtr->Pose.WorldPosition;
-
-			GetOwner()->SetActorLocationAndRotation(Position, Orientation);
-        }
-    }
-}
-
 void UPSMoveComponent::ResetYaw()
 {
     if (DataContextPtr != nullptr)
     {
-        DataContextPtr->Pose.ResetYaw();
+        DataContextPtr->Pose.SnapshotOrientationYaw();
     }
 }
 

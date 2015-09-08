@@ -175,6 +175,10 @@ struct FPSMoveRawControllerData_TLS : public FPSMoveRawControllerData_Base
         this->RumbleRequest = ConcurrentData->RumbleRequest;
         this->ResetPoseRequest = ConcurrentData->ResetPoseRequest;
         this->CycleColourRequest = ConcurrentData->CycleColourRequest;
+
+        // Clear the edge triggered flags after copying from concurrent state
+        ConcurrentData->ResetPoseRequest= false;
+        ConcurrentData->CycleColourRequest= false;
     }
 
     void WorkerPost()
@@ -201,21 +205,24 @@ struct FPSMovePose
     FVector WorldPosition;
     FQuat WorldOrientation;
     FQuat ZeroYaw;
-    FVector LastWorldPosition;
-    FQuat LastWorldOrientation;
+    FQuat UncorrectedWorldOrientation;
 
     void Clear()
     {
         WorldPosition= FVector::ZeroVector;
         WorldOrientation= FQuat::Identity;
         ZeroYaw= FQuat::Identity;
-        LastWorldPosition= FVector::ZeroVector;
-        LastWorldOrientation= FQuat::Identity;
+        UncorrectedWorldOrientation= FQuat::Identity;
     }
 
-    void ResetYaw()
+    void ResetYawSnapshot()
     {
-        ZeroYaw = LastWorldOrientation;
+        ZeroYaw= FQuat::Identity;
+    }
+
+    void SnapshotOrientationYaw()
+    {
+        ZeroYaw = UncorrectedWorldOrientation;
         ZeroYaw.X = 0;
         ZeroYaw.Y = 0;
         ZeroYaw.Normalize();
@@ -322,6 +329,7 @@ struct FPSMoveDataContext
     {
         if (RawControllerData.IsValid() && RawControllerData.IsConnected)
         {
+            Pose.ResetYawSnapshot();
             RawControllerData.ResetPoseRequest = true;
             ComponentPost();
         }
