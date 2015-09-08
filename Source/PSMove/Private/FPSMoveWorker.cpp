@@ -48,7 +48,7 @@ struct TrackingContext
         PSMoveTracker = NULL;
         TrackerWidth = 0;
         TrackerHeight = 0;
-        PSMoveFusion = NULL;        
+        PSMoveFusion = NULL;
     }
 };
 
@@ -119,6 +119,13 @@ bool FPSMoveWorker::AcquirePSMove(
 		// Also this is thread safe because were not actually looking at the concurrent data
 		// at this point, just assigning a pointer to the concurrent data.
 		DataContext->RawControllerData.ConcurrentData = &WorkerControllerDataArray_Concurrent[PSMoveID];
+
+        // TODO: Compute additional transformation to go
+        // from PSM reference frame (possibly transformed to HMD_cam) in GL coordinate system (RHS) in cm
+        // to player reference frame in UE4 coordinate system (LHS) in Unreal Units.
+        // This only needs to be done once.
+
+        //WorkerControllerDataArray[PSMoveID].AdditionalTransform = FTransform(FQuat(), FVector(), FVector());
         
         // The worker thread will create a tracker if one isn't active at this moment
         AcquiredContextCounter.Increment();
@@ -367,6 +374,14 @@ static bool TrackingContextSetup(TrackingContext *context)
         if (context->PSMoveFusion != NULL)
         {
             UE_LOG(LogPSMove, Log, TEXT("PSMove fusion initialized."));
+
+            // TODO: Update additional_transform if available in context
+                if (context->WorkerControllerDataArray[0].AdditionalTransform.GetRotation() != FQuat::Identity
+                    || context->WorkerControllerDataArray[0].AdditionalTransform.GetTranslation() != FVector::ZeroVector)
+            {
+                // Unfortunately we cannot calculate the transform here because necessary information is not available in this thread.
+                //psmove_fusion_update_transform(context->PSMoveFusion, float *pointer_to_3_elem_array, float *pointer_to_4_elem_array);
+            }
         }
         else
         {

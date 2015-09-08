@@ -61,6 +61,8 @@ struct FPSMoveRawControllerData_Base
 
     bool CycleColourRequest;        // Please change to the next available colour.
 
+    FTransform AdditionalTransform; // The transform added to (commuted with) physical transform in psmoveapi.
+
     // -----------
     // Constructor
     FPSMoveRawControllerData_Base()
@@ -80,6 +82,7 @@ struct FPSMoveRawControllerData_Base
         IsConnected = false;
         IsTracking = false;
         IsEnabled = false;
+        AdditionalTransform = FTransform::Identity;
     }
 };
 

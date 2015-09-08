@@ -181,7 +181,9 @@ bool FPSMoveInternal::AcquirePSMove(int32 PlayerIndex, EControllerHand Hand, FPS
 
 		if (WorkerSingleton != NULL)
 		{
-			*OutDataContext = DataContext;
+			*OutDataContext = DataContext;  
+            //i.e. my_PSMoveComponent->DataContextPtr = &(my_FPSMoveSingleton.ControllerDataContexts[DataContextIndex])
+
 			success = WorkerSingleton->AcquirePSMove(PlayerIndex, DataContext);
 		}
 	}
@@ -727,16 +729,16 @@ static bool ComputeTrackingCameraFrustum(
     {
         FTransform RiftToUnrealCS= RiftToUnrealCoordinateSystemTransform();
 
-        // Get the world game camera transform for the player
+        // Get the game camera transform for the player (world reference frame, UE4 coordinate system (LHS), Unreal Units).
         FQuat GameCameraOrientation= GameCameraManager->GetCameraRotation().Quaternion();
         FVector GameCameraLocation= GameCameraManager->GetCameraLocation();
 
-        // Get the HMD pose in UE4 Coordinate System (in Unreal Units)
+        // Get the HMD pose in HMD_internal reference frame (not world), UE4 Coordinate System (LHS), in Unreal Units
         FVector HMDPosition;
         FQuat HMDOrientation;
         GEngine->HMDDevice->GetCurrentOrientationAndPosition(HMDOrientation, HMDPosition);
 
-        // Get the camera pose in HMD_UE4 in UE4_CS. This transforms from HMD_camera to HMD_native
+        // Get the camera pose in HMD_internal reference frame, UE4 Cooridnate System (LHS), Unreal Units.
         FVector TrackingCameraOrigin;
         FQuat TrackingCameraOrientation;
         float TrackingCameraHFOVDegrees;
@@ -748,10 +750,12 @@ static bool ComputeTrackingCameraFrustum(
             TrackingCameraOrigin, TrackingCameraOrientation, 
             TrackingCameraHFOVDegrees, TrackingCameraVFOVDegrees, 
             TrackingCameraDefaultDistance, 
-            TrackingCameraNearPlane, TrackingCameraFarPlane);   
+            TrackingCameraNearPlane, TrackingCameraFarPlane);
 
         // HMDToGameCameraRotation = Undo HMD orientation THEN apply game camera orientation
         FQuat HMDToGameCameraRotation= GameCameraOrientation * HMDOrientation.Inverse();
+
+        // Transforming through this pose will go from HMD_cam reference frame to UE4 internal HMD reference frame.
         FQuat TrackingCameraToGameRotation= HMDToGameCameraRotation * TrackingCameraOrientation;
 
         // Compute the tracking camera location in world space
