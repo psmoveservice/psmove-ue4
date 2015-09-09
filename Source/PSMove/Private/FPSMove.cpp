@@ -842,7 +842,7 @@ static bool ComputeTrackingCameraFrustum(
         FQuat HMDOrientation;
         GEngine->HMDDevice->GetCurrentOrientationAndPosition(HMDOrientation, HMDPosition);
 
-        // Get the camera pose in HMD_UE4 in UE4_CS. This transforms from HMD_camera to HMD_native
+        // Get the camera pose in HMD_internal reference frame, UE4 Cooridnate System (LHS), Unreal Units.
         FVector TrackingCameraOrigin;
         FQuat TrackingCameraOrientation;
         float TrackingCameraHFOVDegrees;
