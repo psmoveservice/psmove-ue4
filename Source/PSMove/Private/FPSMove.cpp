@@ -23,6 +23,9 @@ static bool ComputeTrackingCameraFrustum(
     float *TrackingCameraFarPlane = nullptr, 
     float *TrackingCameraHHalfRadians = nullptr, 
     float *TrackingCameraVHalfRadians = nullptr);
+static bool ComputeTrackingToPlayerTransform(
+    const int32 PlayerIndex,
+    FTransform &TrackingSpaceToPlayerSpace);
 static void DataContextPoseUpdate(const int32 PlayerIndex, FPSMoveDataContext *DataContext);
 static void DrawHMDTrackingFrustum();
 static void DrawPSMoveTrackingDebug(FPSMoveDataContext *DataContext);
@@ -210,11 +213,11 @@ void FPSMoveInternal::UpdateFusionTransform()
     {
         // NOTE: This assumes that all players have the same tracking space to world space transform
         const int32 PlayerIndex= 0;
-        FTransform TrackingSpaceToWorldSpace;
+        FTransform TrackingSpaceToPlayerSpace;
 
-        if (ComputeTrackingCameraFrustum(PlayerIndex, TrackingSpaceToWorldSpace))
+        if (ComputeTrackingToPlayerTransform(PlayerIndex, TrackingSpaceToPlayerSpace))
         {
-            WorkerSingleton->GetFusionState().InputManagerPostFusionTransform(TrackingSpaceToWorldSpace);
+            WorkerSingleton->GetFusionState().InputManagerPostFusionTransform(TrackingSpaceToPlayerSpace);
             RecomputeFusionTransform= false;
         }
         else
@@ -586,29 +589,36 @@ FGamepadKeyNames::Type FPSMoveInputManager::GetButtonName(PSMove_Button Button, 
 #ifdef USE_NEW_POSE_UPDATE
 static void DataContextPoseUpdate(const int32 PlayerIndex, FPSMoveDataContext *DataContext)
 {
-    //FTransform TrackingSpaceToWorldSpace;
+    // The PSMove position is given in the player reference frame in UE4 CS and UE4 units.
+    FVector PSMPosPlayerSpace= DataContext->GetPosition();
 
-    //if (ComputeTrackingCameraFrustum(PlayerIndex, TrackingSpaceToWorldSpace))
-    {
-        ULocalPlayer* LocalPlayer = GEngine->FindFirstLocalPlayerFromControllerId(PlayerIndex);
+    // The PSMove orientation is currently not transformed (though we need to figure that out)
+    FQuat PSMOriNative = DataContext->GetOrientation();
+    FQuat PSMOriWorld = FQuat(PSMOriNative.Y, PSMOriNative.X, PSMOriNative.Z, -PSMOriNative.W);
 
-        // The PSMove position is given in the space of the rift camera in centimeters
-        //FVector PSMPosWorldSpace= TrackingSpaceToWorldSpace.TransformPosition(DataContext->GetPosition());
-        FVector PSMPosWorldSpace= DataContext->GetPosition();
+    // Get the CameraManager for the primary player
+    ULocalPlayer* LocalPlayer = GEngine->FindFirstLocalPlayerFromControllerId(PlayerIndex);
+    APlayerCameraManager* GameCameraManager = UGameplayStatics::GetPlayerCameraManager(LocalPlayer, PlayerIndex);
 
-        // Transform PSMove pose from HMD_native in HMD_CS to HMD_native in UE4_CS
-        // Currently Oculus-specific.
-        FQuat PSMOriNative = DataContext->GetOrientation();
-        FQuat PSMOriWorld = FQuat(PSMOriNative.Y, PSMOriNative.X, PSMOriNative.Z, -PSMOriNative.W);        
+    // Get the game camera transform for the player (world reference frame, UE4 coordinate system (LHS), Unreal Units).
+    FTransform GameCameraManagerTransform = GameCameraManager->GetTransform();
 
-        // Save the resulting pose
-        FPSMovePose *Pose = &DataContext->Pose;
+    /*
+    // TODO: Check if it is necessary to untransform the camera through the HMD. Maybe only if (something like) bFollowsHMD?
+    FVector HeadPosition;
+    FQuat HeadOrient;
+    GEngine->HMDDevice->GetCurrentOrientationAndPosition(HeadOrient, HeadPosition);
+    GameCameraManagerTransform = GameCameraManagerTransform * FTransform(HeadOrient.Inverse(), -HeadPosition);  // TODO: Check right or left multiply.
+    */
 
-        Pose->WorldPosition = PSMPosWorldSpace;
+    FVector PSMPosWorldSpace = GameCameraManagerTransform.TransformPosition(PSMPosPlayerSpace);
+    PSMOriWorld = GameCameraManagerTransform.GetRotation() * PSMOriWorld;
 
-        Pose->UncorrectedWorldOrientation = PSMOriWorld;
-        Pose->WorldOrientation = Pose->ZeroYaw * PSMOriWorld;
-    }
+    // Save the resulting pose
+    FPSMovePose *Pose = &DataContext->Pose;
+    Pose->WorldPosition = PSMPosWorldSpace;
+    Pose->UncorrectedWorldOrientation = PSMOriWorld;
+    Pose->WorldOrientation = Pose->ZeroYaw * PSMOriWorld;
 }
 
 #else
@@ -742,14 +752,67 @@ static void DataContextPoseUpdate(const int32 PlayerIndex, FPSMoveDataContext *D
 }
 #endif
 
-static FTransform RiftToUnrealCoordinateSystemTransform(ULocalPlayer* LocalPlayer)
+static FTransform
+OpenGLToUnrealCoordinateSystemTransform()
+{
+    // OpenGL Coordinate System (RHS) -> Unreal Coordinate system (LHS) ==> (x, y, z) -> (-z, x, y)
+    // This tranform is equivalent to Scale_z(-1)*Rot_y(90)*Rot_x(90)
+    return FTransform(FMatrix(FVector(0, 1, 0), FVector(0, 0, 1), FVector(-1, 0, 0), FVector::ZeroVector));
+}
+
+static FTransform
+CmToUnrealUnitsTransform(ULocalPlayer* LocalPlayer)
 {
     // Conversion from centimeters to unreal units
-    float CMToUU= UHeadMountedDisplayFunctionLibrary::GetWorldToMetersScale(LocalPlayer) / 100.f;
+    float CMToUU = UHeadMountedDisplayFunctionLibrary::GetWorldToMetersScale(LocalPlayer) / 100.f;
+    return FTransform(FQuat::Identity, FVector::ZeroVector, FVector(CMToUU));
+}
 
-    // Rift Coordinate System (in cm) -> Unreal Coordinate system (in UU) ==> (x, y, z) -> (-z, x, y)
-    // This tranform is equivalent to Scale_z(-1)*Rot_y(90)*Rot_x(90)
-    return FTransform(FMatrix(FVector(0, CMToUU, 0), FVector(0, 0, CMToUU), FVector(-CMToUU, 0, 0), FVector::ZeroVector));
+static bool ComputeTrackingToPlayerTransform(
+    const int32 PlayerIndex,
+    FTransform &TrackingSpaceToPlayerSpace // In Unreal Units
+    )
+{
+    bool success = false;
+
+    if (GEngine->HMDDevice.IsValid() && GEngine->IsStereoscopic3D())
+    {
+        // Get the camera pose in internal HMD reference frame, UE4 coordinate system (LHS), in UE4 units.
+        FVector TrackingCameraOrigin;
+        FQuat TrackingCameraOrientation;
+        float TrackingCameraHFOVDegrees;
+        float TrackingCameraVFOVDegrees;
+        float TrackingCameraDefaultDistance;
+        float TrackingCameraNearPlane;
+        float TrackingCameraFarPlane;
+        GEngine->HMDDevice->GetPositionalTrackingCameraProperties(
+            TrackingCameraOrigin, TrackingCameraOrientation,
+            TrackingCameraHFOVDegrees, TrackingCameraVFOVDegrees,
+            TrackingCameraDefaultDistance,
+            TrackingCameraNearPlane, TrackingCameraFarPlane);
+
+        // As it turns out, the camera pose, as a transform, is exactly what we are looking for.
+        TrackingSpaceToPlayerSpace = FTransform(TrackingCameraOrientation, TrackingCameraOrigin, FVector(1.0));
+
+        // This is equivalent to:
+        // FTransform(CameraOri, CameraPos, FVector(1.0))  == Transform through camera in native HMD RF/CS
+        // * CmToUnrealUnitsTransform(LocalPlayer) * OpenGLToUnrealCoordinateSystemTransform()  == (-Z, X, Y)
+        // * FTransform(HMDZeroYaw.Inverse(), -HMDOrigin, FVector(1.0));
+    }
+    else
+    {
+        // Transform from PSEye coordinate system to UE4 coordinate system
+        ULocalPlayer* LocalPlayer = GEngine->FindFirstLocalPlayerFromControllerId(PlayerIndex);
+        TrackingSpaceToPlayerSpace = CmToUnrealUnitsTransform(LocalPlayer) * OpenGLToUnrealCoordinateSystemTransform();
+
+        // TODO: The coordinates are returned relative to the PSEye (or other object if physical_transform exists) in cm.
+        // Typically, this means that the controller will be (e.g.) ~1 m away from the camera, or 1 m behind the player.
+        // It is necessary to prepend the above transform with a translation, but the magnitude of this translation
+        // depends on how far the player is from the tracking camera. It is probably better to require users that are not
+        // using HMDs to call a pose reset. Should that be handled internally in UE4 or by psmoveapi?
+    }
+
+    return success;
 }
 
 static bool ComputeTrackingCameraFrustum(
@@ -768,7 +831,7 @@ static bool ComputeTrackingCameraFrustum(
     
     if (GameCameraManager != nullptr)
     {
-        FTransform RiftToUnrealCS= RiftToUnrealCoordinateSystemTransform(LocalPlayer);
+        FTransform RiftToUnrealCS = CmToUnrealUnitsTransform(LocalPlayer) * OpenGLToUnrealCoordinateSystemTransform();
 
         // Get the game camera transform for the player (world reference frame, UE4 coordinate system (LHS), Unreal Units).
         FQuat GameCameraOrientation= GameCameraManager->GetCameraRotation().Quaternion();
