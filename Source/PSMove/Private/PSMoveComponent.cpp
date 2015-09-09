@@ -73,3 +73,11 @@ void UPSMoveComponent::CycleColours()
         DataContextPtr->PostCycleColourRequest();
     }
 }
+
+void UPSMoveComponent::UpdateFusionTransform()
+{
+    if (DataContextPtr != nullptr)
+    {
+        FPSMove::Get().UpdateFusionTransform();
+    }
+}

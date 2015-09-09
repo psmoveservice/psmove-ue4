@@ -18,6 +18,8 @@ static const float CONTROLLER_COUNT_POLL_INTERVAL = 1000.f; // milliseconds
 // and references to the shared (controller independent) data and the controller(s) data.
 struct TrackingContext
 {
+    FPSMoveFusionState *FusionState;
+
     FPSMoveRawControllerWorkerData_TLS *WorkerControllerDataArray;
     
     PSMove* PSMoves[FPSMoveWorker::k_max_controllers];
@@ -31,8 +33,9 @@ struct TrackingContext
     PSMoveFusion *PSMoveFusion;
     
     // Constructor
-    TrackingContext(FPSMoveRawControllerWorkerData_TLS *controllerDataArray) :
-        WorkerControllerDataArray(controllerDataArray)
+    TrackingContext(FPSMoveFusionState *trackingCameraState, FPSMoveRawControllerWorkerData_TLS *controllerDataArray) 
+        : FusionState(trackingCameraState)
+        , WorkerControllerDataArray(controllerDataArray)
     {
         Reset();
         
@@ -48,7 +51,7 @@ struct TrackingContext
         PSMoveTracker = NULL;
         TrackerWidth = 0;
         TrackerHeight = 0;
-        PSMoveFusion = NULL;        
+        PSMoveFusion = NULL;
     }
 };
 
@@ -56,6 +59,7 @@ struct TrackingContext
 static bool TrackingContextSetup(TrackingContext *context);                                 //
 static bool TrackingContextIsSetup(TrackingContext *context);                               //
 static bool TrackingContextUpdateControllerConnections(TrackingContext *context);           // Add or remove PSMove controllers.
+static void TrackingContextUpdateFusionState(TrackingContext *context);                     // Update sensor fusion transform
 static void TrackingContextTeardown(TrackingContext *context);                              //
 static void ControllerUpdatePositions(PSMoveTracker *psmove_tracker,                        // 
                                       PSMoveFusion *psmove_fusion,
@@ -66,11 +70,41 @@ static void ControllerUpdateOrientations(PSMove *psmove,                        
 static void ControllerUpdateButtonState(PSMove *psmove,                                     //
                                         FPSMoveRawControllerData_Base *controllerData);
 
+// -- Tracking Camera State--
+FPSMoveFusionState::FPSMoveFusionState() 
+    : Lock()
+{
+    FusionTransformDirty = false;
+    FusionTransform = FTransform::Identity;
+}
+
+void FPSMoveFusionState::InputManagerPostFusionTransform(
+    const FTransform &Transform)
+{
+    FScopeLock scopeLock(&Lock);
+
+    this->FusionTransform= Transform;
+    this->FusionTransformDirty= true;
+}
+
+bool FPSMoveFusionState::WorkerReadFusionTransform(
+    FTransform &OutTransform)
+{
+    FScopeLock scopeLock(&Lock);
+    bool WasDirty= this->FusionTransformDirty;
+
+    OutTransform= this->FusionTransform;
+    this->FusionTransformDirty= false;
+
+    return WasDirty;
+}
+
 // -- Worker Thread --
 FPSMoveWorker* FPSMoveWorker::WorkerInstance = NULL;
 
 // The worker spawns the thread that communicates with the PSMoveAPI in parallel to the game thread.
 FPSMoveWorker::FPSMoveWorker() :
+    FusionState(),
     AcquiredContextCounter(0),
     StopTaskCounter(0)
 {
@@ -120,6 +154,14 @@ bool FPSMoveWorker::AcquirePSMove(
 		// at this point, just assigning a pointer to the concurrent data.
 		DataContext->RawControllerData.ConcurrentData = &WorkerControllerDataArray_Concurrent[PSMoveID];
         
+
+        // TODO: Compute additional transformation to go
+        // from PSM reference frame (possibly transformed to HMD_cam) in GL coordinate system (RHS) in cm
+        // to player reference frame in UE4 coordinate system (LHS) in Unreal Units.
+        // This only needs to be done once.
+
+        //WorkerControllerDataArray[PSMoveID].AdditionalTransform = FTransform(FQuat(), FVector(), FVector());
+
         // The worker thread will create a tracker if one isn't active at this moment
         AcquiredContextCounter.Increment();
 
@@ -148,7 +190,7 @@ uint32 FPSMoveWorker::Run()
     // * psmove fusion state
     // * psmove controller state
     // Tracking state is only initialized when we have a non-zero number of tracking contexts
-    TrackingContext Context(WorkerControllerDataArray);
+    TrackingContext Context(&FusionState, WorkerControllerDataArray);
     
     if (!psmove_init(PSMOVE_CURRENT_VERSION))
     {
@@ -176,6 +218,10 @@ uint32 FPSMoveWorker::Run()
                        
             // Setup or tear down controller connections based on the number of active controllers
             TrackingContextUpdateControllerConnections(&Context);
+
+            // Update the fusion transform if a new transform was posted
+            // TODO: This doesn't appear to apply the transform in the way we expect
+            //TrackingContextUpdateFusionState(&Context);
             
             // Update the raw positions of the controllers
             {
@@ -197,6 +243,15 @@ uint32 FPSMoveWorker::Run()
                                               Context.PSMoveFusion,
                                               Context.PSMoves[psmove_id],
                                               &localControllerData);
+
+                    // TODO: This is simulating the effect of what TrackingContextUpdateFusionState() should be doing
+                    if (localControllerData.IsTracking)
+                    {
+                        FTransform transform;
+
+                        FusionState.WorkerReadFusionTransform(transform);
+                        localControllerData.PSMovePosition= transform.TransformPosition(localControllerData.PSMovePosition);
+                    }
                 }
             }
             
@@ -469,6 +524,25 @@ static bool TrackingContextUpdateControllerConnections(TrackingContext *context)
     }
     
     return controllerCountChanged;
+}
+
+static void TrackingContextUpdateFusionState(TrackingContext *context)
+{
+    FTransform FusionTransform;
+
+    if (context->FusionState->WorkerReadFusionTransform(FusionTransform))
+    {
+        FVector Translation = FusionTransform.GetTranslation();
+        FQuat Rotation= FusionTransform.GetRotation();
+        FVector Scale= FusionTransform.GetScale3D();
+
+        float t[3]= {Translation.X, Translation.Y, Translation.Z};
+        float r[4]= {Rotation.W, Rotation.X, Rotation.Y, Rotation.Z};
+        float s[3]= {Scale.X, Scale.Y, Scale.Z};
+
+        check(context->PSMoveFusion != nullptr);
+        psmove_fusion_update_transform(context->PSMoveFusion, t, r, s);
+    }
 }
 
 static void TrackingContextTeardown(TrackingContext *context)

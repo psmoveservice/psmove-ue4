@@ -121,6 +121,9 @@ public:
 	virtual bool AcquirePSMove(int32 PlayerIndex, EControllerHand Hand, FPSMoveDataContext **OutDataContext) override;
 	virtual void ReleasePSMove(FPSMoveDataContext *DataContext) override;
 
+    virtual void UpdateFusionTransform() override;
+    bool WantsToRecomputeFusionTransform() const { return RecomputeFusionTransform; }
+
 	const FPSMoveDataContext *GetDataContextByPlayerHandConst(const int32 PlayerIndex, const EControllerHand Hand) const;
 	FPSMoveDataContext *GetDataContextByPlayerHand(const int32 PlayerIndex, const EControllerHand Hand);
 
@@ -133,6 +136,9 @@ public:
 private:
 	// Controller states
 	FPSMoveDataContext ControllerDataContexts[MaxControllers];
+
+    // Used for computing the fusion transform on demand
+    bool RecomputeFusionTransform;
 };
 
 IMPLEMENT_MODULE(FPSMoveInternal, PSMove)
@@ -152,6 +158,9 @@ void FPSMoveInternal::StartupModule()
 	// Init the PSMoveWorker singleton.
 	UE_LOG(LogPSMove, Log, TEXT("Initializing PSMoveWorker Thread..."));
 	FPSMoveWorker::InitializeSingleton();
+
+    // Don't recompute until someone asks us to
+    RecomputeFusionTransform= false;
 }
 
 void FPSMoveInternal::ShutdownModule()
@@ -181,12 +190,39 @@ bool FPSMoveInternal::AcquirePSMove(int32 PlayerIndex, EControllerHand Hand, FPS
 
 		if (WorkerSingleton != NULL)
 		{
+            //i.e. my_PSMoveComponent->DataContextPtr = &(my_FPSMoveSingleton.ControllerDataContexts[DataContextIndex])
 			*OutDataContext = DataContext;
-			success = WorkerSingleton->AcquirePSMove(PlayerIndex, DataContext);
+
+            success= WorkerSingleton->AcquirePSMove(PlayerIndex, DataContext);
+
+            // Recompute the fusion transform when a new controller connects
+            RecomputeFusionTransform= true;
 		}
 	}
 
 	return success;
+}
+
+void FPSMoveInternal::UpdateFusionTransform()
+{
+	FPSMoveWorker* WorkerSingleton = FPSMoveWorker::GetSingletonInstance();
+	if (WorkerSingleton != NULL)
+    {
+        // NOTE: This assumes that all players have the same tracking space to world space transform
+        const int32 PlayerIndex= 0;
+        FTransform TrackingSpaceToWorldSpace;
+
+        if (ComputeTrackingCameraFrustum(PlayerIndex, TrackingSpaceToWorldSpace))
+        {
+            WorkerSingleton->GetFusionState().InputManagerPostFusionTransform(TrackingSpaceToWorldSpace);
+            RecomputeFusionTransform= false;
+        }
+        else
+        {
+            UE_LOG(LogPSMove, Error, TEXT("Failed to compute tracking camera transform. World not initialized?"));
+            RecomputeFusionTransform= true;
+        }
+    }
 }
 
 void FPSMoveInternal::ReleasePSMove(FPSMoveDataContext *DataContext)
@@ -260,6 +296,12 @@ void FPSMoveInputManager::Tick(float DeltaTime)
             int32 PlayerIndex;
             EControllerHand Hand;
             FPSMoveInternal::DataContextIndexToPlayerHand(DataContextIndex, PlayerIndex, Hand);
+
+            // Only bother recomputing fusion transform until we absolute have to
+            if (PSMovePlugin->WantsToRecomputeFusionTransform())
+            {
+                PSMovePlugin->UpdateFusionTransform();
+            }
 
             DataContextPoseUpdate(PlayerIndex, DataContext);
         }
@@ -544,16 +586,15 @@ FGamepadKeyNames::Type FPSMoveInputManager::GetButtonName(PSMove_Button Button, 
 #ifdef USE_NEW_POSE_UPDATE
 static void DataContextPoseUpdate(const int32 PlayerIndex, FPSMoveDataContext *DataContext)
 {
-    FTransform TrackingSpaceToWorldSpace;
+    //FTransform TrackingSpaceToWorldSpace;
 
-    if (ComputeTrackingCameraFrustum(PlayerIndex, TrackingSpaceToWorldSpace))
+    //if (ComputeTrackingCameraFrustum(PlayerIndex, TrackingSpaceToWorldSpace))
     {
         ULocalPlayer* LocalPlayer = GEngine->FindFirstLocalPlayerFromControllerId(PlayerIndex);
 
         // The PSMove position is given in the space of the rift camera in centimeters
-        float CentimetersToUnrealUnits= UHeadMountedDisplayFunctionLibrary::GetWorldToMetersScale(LocalPlayer) / 100.f;
-        FVector PSMPosTrackingSpace= DataContext->GetPosition() * CentimetersToUnrealUnits;
-        FVector PSMPosWorldSpace= TrackingSpaceToWorldSpace.TransformPosition(PSMPosTrackingSpace);
+        //FVector PSMPosWorldSpace= TrackingSpaceToWorldSpace.TransformPosition(DataContext->GetPosition());
+        FVector PSMPosWorldSpace= DataContext->GetPosition();
 
         // Transform PSMove pose from HMD_native in HMD_CS to HMD_native in UE4_CS
         // Currently Oculus-specific.
@@ -701,11 +742,14 @@ static void DataContextPoseUpdate(const int32 PlayerIndex, FPSMoveDataContext *D
 }
 #endif
 
-static FTransform RiftToUnrealCoordinateSystemTransform()
+static FTransform RiftToUnrealCoordinateSystemTransform(ULocalPlayer* LocalPlayer)
 {
-    // Rift Coordinate System -> Unreal Coordinate system ==> (x, y, z) -> (-z, x, y)
+    // Conversion from centimeters to unreal units
+    float CMToUU= UHeadMountedDisplayFunctionLibrary::GetWorldToMetersScale(LocalPlayer) / 100.f;
+
+    // Rift Coordinate System (in cm) -> Unreal Coordinate system (in UU) ==> (x, y, z) -> (-z, x, y)
     // This tranform is equivalent to Scale_z(-1)*Rot_y(90)*Rot_x(90)
-    return FTransform(FMatrix(FVector(0, 1, 0), FVector(0, 0, 1), FVector(-1, 0, 0), FVector::ZeroVector));
+    return FTransform(FMatrix(FVector(0, CMToUU, 0), FVector(0, 0, CMToUU), FVector(-CMToUU, 0, 0), FVector::ZeroVector));
 }
 
 static bool ComputeTrackingCameraFrustum(
@@ -722,16 +766,15 @@ static bool ComputeTrackingCameraFrustum(
     ULocalPlayer* LocalPlayer = GEngine->FindFirstLocalPlayerFromControllerId(PlayerIndex);
     APlayerCameraManager* GameCameraManager = UGameplayStatics::GetPlayerCameraManager(LocalPlayer, PlayerIndex);
     
-
     if (GameCameraManager != nullptr)
     {
-        FTransform RiftToUnrealCS= RiftToUnrealCoordinateSystemTransform();
+        FTransform RiftToUnrealCS= RiftToUnrealCoordinateSystemTransform(LocalPlayer);
 
-        // Get the world game camera transform for the player
+        // Get the game camera transform for the player (world reference frame, UE4 coordinate system (LHS), Unreal Units).
         FQuat GameCameraOrientation= GameCameraManager->GetCameraRotation().Quaternion();
         FVector GameCameraLocation= GameCameraManager->GetCameraLocation();
 
-        // Get the HMD pose in UE4 Coordinate System (in Unreal Units)
+        // Get the HMD pose in HMD_internal reference frame (not world), UE4 Coordinate System (LHS), in Unreal Units
         FVector HMDPosition;
         FQuat HMDOrientation;
         GEngine->HMDDevice->GetCurrentOrientationAndPosition(HMDOrientation, HMDPosition);
@@ -748,10 +791,12 @@ static bool ComputeTrackingCameraFrustum(
             TrackingCameraOrigin, TrackingCameraOrientation, 
             TrackingCameraHFOVDegrees, TrackingCameraVFOVDegrees, 
             TrackingCameraDefaultDistance, 
-            TrackingCameraNearPlane, TrackingCameraFarPlane);   
+            TrackingCameraNearPlane, TrackingCameraFarPlane);
 
         // HMDToGameCameraRotation = Undo HMD orientation THEN apply game camera orientation
         FQuat HMDToGameCameraRotation= GameCameraOrientation * HMDOrientation.Inverse();
+
+        // Transforming through this pose will go from HMD_cam reference frame to UE4 internal HMD reference frame.
         FQuat TrackingCameraToGameRotation= HMDToGameCameraRotation * TrackingCameraOrientation;
 
         // Compute the tracking camera location in world space
@@ -816,26 +861,17 @@ static void DrawHMDTrackingFrustum()
             TrackingCameraHHalfRadians, 
             TrackingCameraVHalfRadians, 
             FColor::Yellow);
-        DrawBasis(LocalPlayer->GetWorld(), TrackingSpaceToWorldSpace, 50.f);
+        DrawBasis(LocalPlayer->GetWorld(), TrackingSpaceToWorldSpace, 50.f); // 50 cm
     }
 }
 
 static void DrawPSMoveTrackingDebug(FPSMoveDataContext *DataContext)
 {
     const int32 PlayerIndex= 0;
-    FTransform TrackingSpaceToWorldSpace;
+    ULocalPlayer* LocalPlayer = GEngine->FindFirstLocalPlayerFromControllerId(PlayerIndex);
+    FVector PSMoveInWorldSpace= DataContext->GetPosition();
 
-    if (ComputeTrackingCameraFrustum(PlayerIndex, TrackingSpaceToWorldSpace))
-    {
-        ULocalPlayer* LocalPlayer = GEngine->FindFirstLocalPlayerFromControllerId(PlayerIndex);
-
-        // The PSMove position is given in the space of the rift camera in centimeters
-        float CentimetersToUnrealUnits= UHeadMountedDisplayFunctionLibrary::GetWorldToMetersScale(LocalPlayer) / 100.f;
-        FVector PSMoveInRiftTrackingSpace= DataContext->GetPosition() * CentimetersToUnrealUnits;
-        FVector PSMoveInWorldSpace= TrackingSpaceToWorldSpace.TransformPosition(PSMoveInRiftTrackingSpace);
-
-        DrawDebugSphere(LocalPlayer->GetWorld(), PSMoveInWorldSpace, 3.f, 15, FColor::White);
-    }
+    DrawDebugSphere(LocalPlayer->GetWorld(), PSMoveInWorldSpace, 3.f, 15, FColor::White);
 }
 
 static void DrawBasis(
