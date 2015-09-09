@@ -95,6 +95,13 @@ enum PSMoveTracker_Smoothing_Type {
 	Smoothing_LowPass,	// A basic low pass filter (default)
 	Smoothing_Kalman,	// A more expensive Kalman filter 
 };
+    
+/*! Known camera types. Used for calculating focal length when calibration not present. */
+enum PSMoveTracker_Camera_type {
+    PSMove_Camera_PS3EYE_BLUEDOT,
+    PSMove_Camera_PS3EYE_REDDOT,
+    PSMove_Camera_Unknown
+};
 
 struct _PSMoveTrackerSmoothingSettings {
     // Low Pass Filter Options
@@ -120,6 +127,7 @@ typedef struct {
     int camera_exposure;                        /* [(255 * 15) / 0xFFFF] [0,0xFFFF] */
     int camera_brightness;                      /* [0] [0,0xFFFF] */
     enum PSMove_Bool camera_mirror;             /* [PSMove_False] mirror camera image horizontally */
+    enum PSMoveTracker_Camera_type camera_type; /* [PSMove_Camera_PS3EYE_BLUEDOT] camera type. Used for focal length when OpenCV calib missing */
 
     /* Settings for camera calibration process */
     enum PSMoveTracker_Exposure exposure_mode;  /* [Exposure_LOW] exposure mode for setting target luminance */
@@ -351,6 +359,29 @@ ADDCALL psmove_tracker_set_exposure(PSMoveTracker *tracker, enum PSMoveTracker_E
  **/
 ADDAPI enum PSMoveTracker_Exposure
 ADDCALL psmove_tracker_get_exposure(PSMoveTracker *tracker);
+    
+/**
+ * \brief Set the desired camera focal length.
+ *
+ * This function sets the desired camera focal length. Only use this if you
+ * have NOT calibrated the camera (with OpenCV checkerboard utility)
+ * and if you really know what you are doing.
+ *
+ * \param tracker A valid \ref PSMoveTracker handle
+ * \param focal_length The (float) focal length in pixels to be set.
+ **/
+ADDAPI void
+ADDCALL psmove_tracker_set_focal_length(PSMoveTracker *tracker, float focal_length);
+
+/**
+ * \brief Get the camera's focal_length (in pixels)
+ *
+ * \param tracker A valid \ref PSMoveTracker handle
+ *
+ * \param float* focal_length_out A pointer to the output value
+ **/
+ADDAPI int
+ADDCALL psmove_tracker_get_focal_length(PSMoveTracker *tracker, float* focal_length_out);
 
 /**
  * \brief Set the smoothing filter settings.
