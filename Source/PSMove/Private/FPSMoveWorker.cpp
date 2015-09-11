@@ -220,8 +220,7 @@ uint32 FPSMoveWorker::Run()
             TrackingContextUpdateControllerConnections(&Context);
 
             // Update the fusion transform if a new transform was posted
-            // TODO: This doesn't appear to apply the transform in the way we expect
-            //TrackingContextUpdateFusionState(&Context);
+            TrackingContextUpdateFusionState(&Context);
             
             // Update the raw positions of the controllers
             {
@@ -238,20 +237,13 @@ uint32 FPSMoveWorker::Run()
                 for (int psmove_id = 0; psmove_id < Context.PSMoveCount; psmove_id++)
                 {
                     FPSMoveRawControllerWorkerData_TLS &localControllerData = WorkerControllerDataArray[psmove_id];
-                    
+                                
                     ControllerUpdatePositions(Context.PSMoveTracker,
                                               Context.PSMoveFusion,
                                               Context.PSMoves[psmove_id],
                                               &localControllerData);
 
-                    // TODO: This is simulating the effect of what TrackingContextUpdateFusionState() should be doing
-                    if (localControllerData.IsTracking)
-                    {
-                        FTransform transform;
 
-                        FusionState.WorkerReadFusionTransform(transform);
-                        localControllerData.PSMovePosition= transform.TransformPosition(localControllerData.PSMovePosition);
-                    }
                 }
             }
             
@@ -532,16 +524,9 @@ static void TrackingContextUpdateFusionState(TrackingContext *context)
 
     if (context->FusionState->WorkerReadFusionTransform(FusionTransform))
     {
-        FVector Translation = FusionTransform.GetTranslation();
-        FQuat Rotation= FusionTransform.GetRotation();
-        FVector Scale= FusionTransform.GetScale3D();
-
-        float t[3]= {Translation.X, Translation.Y, Translation.Z};
-        float r[4]= {Rotation.W, Rotation.X, Rotation.Y, Rotation.Z};
-        float s[3]= {Scale.X, Scale.Y, Scale.Z};
-
         check(context->PSMoveFusion != nullptr);
-        psmove_fusion_update_transform(context->PSMoveFusion, t, r, s);
+        FMatrix FusionTransformMatrix = FusionTransform.ToMatrixWithScale();
+        psmove_fusion_update_transform_mat44(context->PSMoveFusion, (float *)FusionTransformMatrix.M);
     }
 }
 
