@@ -58,11 +58,15 @@ void UPSMoveComponent::ResetYaw()
     }
 }
 
-void UPSMoveComponent::ResetPose()
+void UPSMoveComponent::ResetPosition()
 {
-    if (DataContextPtr != nullptr)
+    if (DataContextPtr != nullptr && (GEngine->HMDDevice.IsValid() && GEngine->IsStereoscopic3D()))
     {
-        DataContextPtr->PostResetPoseRequest();
+        DataContextPtr->Pose.SnapshotPosition();
+    }
+    else
+    {
+        DataContextPtr->Pose.ResetPositionSnapshot();
     }
 }
 
