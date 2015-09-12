@@ -53,12 +53,4 @@ public:
     virtual void ReleasePSMove(FPSMoveDataContext *DataContext)
     {
     }
-
-    /**
-     * Tell the PSMove module to recompute the Tracking Camera to world transform.
-     * This transform is used to turn the tracking camera coordinates into unreal world coordinates.
-     */
-    virtual void UpdateFusionTransform()
-    {
-    }
 };

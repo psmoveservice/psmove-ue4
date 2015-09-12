@@ -19,23 +19,6 @@ struct FPSMoveRawControllerWorkerData_TLS : public FPSMoveRawControllerData_TLS
     }
 };
 
-class FPSMoveFusionState
-{
-public:
-    FPSMoveFusionState();
-
-    /** Stores the current tracking camera fusion transform. Applied on next update when tracker is active */
-    void InputManagerPostFusionTransform(const FTransform &Transform);
-
-    /** Reads tracking camera fusion transform on the worker thread. Returns true if it changed */
-    bool WorkerReadFusionTransform(FTransform &OutTransform);
-
-private:
-    FCriticalSection Lock;
-    bool FusionTransformDirty;
-    FTransform FusionTransform;
-};
-
 class FPSMoveWorker : public FRunnable
 {
 public:
@@ -58,9 +41,6 @@ public:
     /** Tell the PSMove Worker that we don't care about listening to this controller anymore. */
     void ReleasePSMove(FPSMoveDataContext *DataContext);
 
-    /** Used by input manager to publish changes to fusion state */
-    FPSMoveFusionState &GetFusionState() { return FusionState; }
-
 private:
     FPSMoveWorker(); // Called by singleton access via Init
     virtual ~FPSMoveWorker();
@@ -77,9 +57,6 @@ private:
     /** Thread for polling the controller and tracker */
     FRunnableThread* Thread;
     
-    /** Used to publish changes to tracking camera state to the worker thread */
-    FPSMoveFusionState FusionState;
-
     /** Thread Safe Counter. */
     FThreadSafeCounter AcquiredContextCounter;
 

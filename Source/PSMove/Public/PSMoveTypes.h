@@ -213,6 +213,7 @@ struct FPSMovePose
     {
         WorldPosition= FVector::ZeroVector;
         ZeroPosition = FVector::ZeroVector;
+        UncorrectedWorldPosition = FVector::ZeroVector;
         WorldOrientation= FQuat::Identity;
         ZeroYaw= FQuat::Identity;
         UncorrectedWorldOrientation= FQuat::Identity;

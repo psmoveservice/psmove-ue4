@@ -36,9 +36,6 @@ public:
     UFUNCTION(BlueprintCallable, Category = "PSMove")
     void CycleColours();
 
-    UFUNCTION(BlueprintCallable, Category = "PSMove")
-    void UpdateFusionTransform();
-
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Debug)
     bool bShowHMDFrustumDebug;
 
