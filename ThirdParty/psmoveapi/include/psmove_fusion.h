@@ -38,12 +38,6 @@
 extern "C" {
 #endif
 
-
-/* Field of view of the PS Eye */
-#define PSEYE_FOV_BLUE_DOT 75
-#define PSEYE_FOV_RED_DOT 56
-
-
 /* This struct is used by the SWIG bindings as result value */
 typedef struct {
     float m[16];
@@ -65,9 +59,23 @@ typedef struct _PSMoveFusion PSMoveFusion; /*!< Handle to a PS Move Fusion objec
 *                   additional transform translation
 * \param quat_wxyz  A pointer to a float[4] array representing the
 *                   additional transform quaternion
+* \param scale_xyz  A pointer to a float[3] array representing the
+*                   additional transform scale
 **/
 ADDAPI void
-ADDCALL psmove_fusion_update_transform(PSMoveFusion *fusion, float *pos_xyz, float *quat_wxyz);
+ADDCALL psmove_fusion_update_transform(PSMoveFusion *fusion, float *pos_xyz, float *quat_wxyz, float *scale_xyz);
+
+/**
+* \brief Combines provided transform with physical_xf for total_xf
+*
+* Creates and returns a new \ref PSMoveFusion object.
+*
+* \param fusion     A valid \ref PSMoveFusion handle
+* \param mat44      A pointer to a float[16] array representing the
+*                   additional transform
+**/
+ADDAPI void
+ADDCALL psmove_fusion_update_transform_mat44(PSMoveFusion *fusion, float *mat44);
 
 /**
 * \brief Resets both physical_xf and total_xf to identity matrix.

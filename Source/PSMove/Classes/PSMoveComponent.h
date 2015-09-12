@@ -28,10 +28,10 @@ public:
 	TEnumAsByte<EControllerHand> Hand;
 
     UFUNCTION(BlueprintCallable, Category = "PSMove")
-    void ResetPose();
+    void ResetYaw();
 
     UFUNCTION(BlueprintCallable, Category = "PSMove")
-    void ResetYaw();
+    void ResetPosition();
 
     UFUNCTION(BlueprintCallable, Category = "PSMove")
     void CycleColours();

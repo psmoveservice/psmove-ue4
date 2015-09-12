@@ -203,6 +203,8 @@ struct FPSMoveRawControllerData_TLS : public FPSMoveRawControllerData_Base
 struct FPSMovePose
 {
     FVector WorldPosition;
+    FVector ZeroPosition;
+    FVector UncorrectedWorldPosition;
     FQuat WorldOrientation;
     FQuat ZeroYaw;
     FQuat UncorrectedWorldOrientation;
@@ -210,6 +212,7 @@ struct FPSMovePose
     void Clear()
     {
         WorldPosition= FVector::ZeroVector;
+        ZeroPosition = FVector::ZeroVector;
         WorldOrientation= FQuat::Identity;
         ZeroYaw= FQuat::Identity;
         UncorrectedWorldOrientation= FQuat::Identity;
@@ -227,6 +230,16 @@ struct FPSMovePose
         ZeroYaw.Y = 0;
         ZeroYaw.Normalize();
         ZeroYaw = ZeroYaw.Inverse();
+    }
+
+    void ResetPositionSnapshot()
+    {
+        ZeroPosition = FVector::ZeroVector;
+    }
+
+    void SnapshotPosition()
+    {
+        ZeroPosition = UncorrectedWorldPosition;
     }
 };
 
