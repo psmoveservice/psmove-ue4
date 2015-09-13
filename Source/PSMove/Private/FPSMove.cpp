@@ -676,7 +676,7 @@ static bool ComputeTrackingToWorldTransformAndFrustum(
             // Pretend that the tracking camera is directly in front of the game camera
             const float FakeTrackingCameraOffset= k_default_tracking_distance * MetersToUU;
             FVector FakeTrackingCameraWorldSpaceOrigin = 
-                GameCameraLocation + GameCameraOrientation.GetForwardVector()*FakeTrackingCameraOffset;
+                GameCameraLocation + GameCameraOrientation.GetAxisX()*FakeTrackingCameraOffset;
 
             // Get tracking frustum properties from defaults
             TrackingCameraHHalfRadians= FMath::DegreesToRadians(k_default_tracking_hfov_degrees/2.f);
