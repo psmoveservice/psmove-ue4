@@ -48,7 +48,7 @@ struct TrackingContext
         PSMoveTracker = NULL;
         TrackerWidth = 0;
         TrackerHeight = 0;
-        PSMoveFusion = NULL;        
+        PSMoveFusion = NULL;
     }
 };
 
@@ -74,16 +74,16 @@ FPSMoveWorker::FPSMoveWorker() :
     AcquiredContextCounter(0),
     StopTaskCounter(0)
 {
-	// Setup the controller data entries
-	for (int32 controller_index = 0; controller_index < FPSMoveWorker::k_max_controllers; ++controller_index)
-	{
-		// Make sure the controller entries are initialized
-		WorkerControllerDataArray[controller_index].Clear();
-		WorkerControllerDataArray_Concurrent[controller_index].Clear();
+    // Setup the controller data entries
+    for (int32 controller_index = 0; controller_index < FPSMoveWorker::k_max_controllers; ++controller_index)
+    {
+        // Make sure the controller entries are initialized
+        WorkerControllerDataArray[controller_index].Clear();
+        WorkerControllerDataArray_Concurrent[controller_index].Clear();
 
-		// Bind the controller worker concurrent data to its corresponding thread-local container
-		WorkerControllerDataArray[controller_index].ConcurrentData = &WorkerControllerDataArray_Concurrent[controller_index];
-	}
+        // Bind the controller worker concurrent data to its corresponding thread-local container
+        WorkerControllerDataArray[controller_index].ConcurrentData = &WorkerControllerDataArray_Concurrent[controller_index];
+    }
     
     // This Inits and Runs the thread.
     Thread = FRunnableThread::Create(this, TEXT("FPSMoveWorker"), 0, TPri_Normal);
@@ -102,31 +102,31 @@ bool FPSMoveWorker::Init()
 }
 
 bool FPSMoveWorker::AcquirePSMove(
-	int32 PSMoveID,
-	FPSMoveDataContext *DataContext)
+    int32 PSMoveID,
+    FPSMoveDataContext *DataContext)
 {
-	bool success = false;
+    bool success = false;
 
-	if (PSMoveID >= 0 && PSMoveID < FPSMoveWorker::k_max_controllers)
-	{
-		// Remember which PSMove the data context is assigned to
-		DataContext->Clear();
-		DataContext->PSMoveID = PSMoveID;
+    if (PSMoveID >= 0 && PSMoveID < FPSMoveWorker::k_max_controllers)
+    {
+        // Remember which PSMove the data context is assigned to
+        DataContext->Clear();
+        DataContext->PSMoveID = PSMoveID;
 
-		// Bind the data context to the concurrent data for the requested controller
-		// This doesn't mean  that the controller is active, just that a component
-		// is now watching this block of data.
-		// Also this is thread safe because were not actually looking at the concurrent data
-		// at this point, just assigning a pointer to the concurrent data.
-		DataContext->RawControllerData.ConcurrentData = &WorkerControllerDataArray_Concurrent[PSMoveID];
-        
+        // Bind the data context to the concurrent data for the requested controller
+        // This doesn't mean  that the controller is active, just that a component
+        // is now watching this block of data.
+        // Also this is thread safe because were not actually looking at the concurrent data
+        // at this point, just assigning a pointer to the concurrent data.
+        DataContext->RawControllerData.ConcurrentData = &WorkerControllerDataArray_Concurrent[PSMoveID];
+
         // The worker thread will create a tracker if one isn't active at this moment
         AcquiredContextCounter.Increment();
 
-		success = true;
-	}
+        success = true;
+    }
 
-	return success;
+    return success;
 }
 
 void FPSMoveWorker::ReleasePSMove(FPSMoveDataContext *DataContext)
@@ -192,7 +192,7 @@ uint32 FPSMoveWorker::Run()
                 for (int psmove_id = 0; psmove_id < Context.PSMoveCount; psmove_id++)
                 {
                     FPSMoveRawControllerWorkerData_TLS &localControllerData = WorkerControllerDataArray[psmove_id];
-                    
+                                
                     ControllerUpdatePositions(Context.PSMoveTracker,
                                               Context.PSMoveFusion,
                                               Context.PSMoves[psmove_id],
