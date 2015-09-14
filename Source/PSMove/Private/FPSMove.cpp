@@ -22,11 +22,16 @@ static float k_default_tracking_far_plane_distance = 2.5f; // meters
 //-- prototypes -----
 //-- Tracking Transform Helpers -----
 static void DataContextPoseUpdate(const int32 PlayerIndex, FPSMoveDataContext *DataContext);
+static FQuat PSMoveQuatToUnrealQuat(const FQuat &PSMoveQuat);
 static FTransform RHSCMToUnrealUUTransform(ULocalPlayer* LocalPlayer);
-static bool ComputeTrackingToWorldTransform(const int32 PlayerIndex, FTransform &TrackingSpaceToWorldSpace);
-static bool ComputeTrackingToWorldTransformAndFrustum(
+static bool ComputeTrackingToWorldTransforms(
+    const int32 PlayerIndex, 
+    FTransform &TrackingSpaceToWorldSpacePosition,
+    FQuat &OrientationTransform);
+static bool ComputeTrackingToWorldTransformsAndFrustum(
     const int32 PlayerIndex,
-    FTransform &TrackingSpaceToWorldSpace,
+    FTransform &TrackingSpaceToWorldSpacePosition,
+    FQuat &OrientationTransform,
     float &TrackingCameraNearPlane, 
     float &TrackingCameraFarPlane, 
     float &TrackingCameraHHalfRadians, 
@@ -556,19 +561,24 @@ FGamepadKeyNames::Type FPSMoveInputManager::GetButtonName(PSMove_Button Button, 
 //-- Tracking Transform Helpers -----
 static void DataContextPoseUpdate(const int32 PlayerIndex, FPSMoveDataContext *DataContext)
 {     
-    FTransform TrackingSpaceToWorldSpace;
+    FTransform TrackingSpaceToWorldSpacePosition;
+    FQuat OrientationTransform;
 
-    if (ComputeTrackingToWorldTransform(PlayerIndex, TrackingSpaceToWorldSpace))
+    if (ComputeTrackingToWorldTransforms(
+            PlayerIndex,
+            TrackingSpaceToWorldSpacePosition,
+            OrientationTransform))
     {
         // The PSMove position is given in the space of the rift camera in centimeters
         FVector PSMPosTrackingSpace = DataContext->GetPosition();
         // Transform to world space
-        FVector PSMPosWorldSpace= TrackingSpaceToWorldSpace.TransformPosition(PSMPosTrackingSpace);
+        FVector PSMPosWorldSpace= TrackingSpaceToWorldSpacePosition.TransformPosition(PSMPosTrackingSpace);
 
         // The PSMove orientation is given in its native coordinate system
         FQuat PSMOriNative = DataContext->GetOrientation();
-        // Transform to UE4 coordinate system.
-        FQuat PSMOriWorld = FQuat(PSMOriNative.Y, PSMOriNative.X, PSMOriNative.Z, -PSMOriNative.W);        
+        // NOTE: Intentionally backwards multiplication for quaternions
+        // Apply controller orientation first, then apply orientation transform
+        FQuat PSMOriWorld = OrientationTransform * PSMoveQuatToUnrealQuat(PSMOriNative);
 
         // Save the resulting pose, updating for internal offset/zeroyaw
         FPSMovePose *Pose = &DataContext->Pose;
@@ -577,6 +587,11 @@ static void DataContextPoseUpdate(const int32 PlayerIndex, FPSMoveDataContext *D
         Pose->UncorrectedWorldOrientation = PSMOriWorld;
         Pose->WorldOrientation = Pose->ZeroYaw * PSMOriWorld;
     }
+}
+
+static FQuat PSMoveQuatToUnrealQuat(const FQuat &PSMoveQuat)
+{
+    return FQuat(PSMoveQuat.Y, PSMoveQuat.X, PSMoveQuat.Z, -PSMoveQuat.W);
 }
 
 static FTransform RHSCMToUnrealUUTransform(ULocalPlayer* LocalPlayer)
@@ -592,9 +607,10 @@ static FTransform RHSCMToUnrealUUTransform(ULocalPlayer* LocalPlayer)
     return FTransform(FMatrix(FVector(0, CMToUU, 0), FVector(0, 0, CMToUU), FVector(-CMToUU, 0, 0), FVector::ZeroVector));
 }
 
-static bool ComputeTrackingToWorldTransform(
+static bool ComputeTrackingToWorldTransforms(
     const int32 PlayerIndex,
-    FTransform &TrackingSpaceToWorldSpace)
+    FTransform &TrackingSpaceToWorldSpacePosition,
+    FQuat &OrientationTransform)
 {
     float TrackingCameraNearPlane;
     float TrackingCameraFarPlane;
@@ -602,18 +618,20 @@ static bool ComputeTrackingToWorldTransform(
     float TrackingCameraVHalfRadians;
 
     return 
-    ComputeTrackingToWorldTransformAndFrustum(
+    ComputeTrackingToWorldTransformsAndFrustum(
         PlayerIndex,
-        TrackingSpaceToWorldSpace, // In Unreal Units
+        TrackingSpaceToWorldSpacePosition, // In Unreal Units
+        OrientationTransform, // In Unreal Coordinate System
         TrackingCameraNearPlane, // In Unreal Units
         TrackingCameraFarPlane, // In Unreal Units
         TrackingCameraHHalfRadians, 
         TrackingCameraVHalfRadians);
 }
 
-static bool ComputeTrackingToWorldTransformAndFrustum(
+static bool ComputeTrackingToWorldTransformsAndFrustum(
     const int32 PlayerIndex,
-    FTransform &TrackingSpaceToWorldSpace, // In Unreal Units
+    FTransform &TrackingSpaceToWorldSpacePosition, // In Unreal Units
+    FQuat &OrientationTransform, // In Unreal Coordinate System
     float &TrackingCameraNearPlane, // In Unreal Units
     float &TrackingCameraFarPlane, // In Unreal Units
     float &TrackingCameraHHalfRadians, 
@@ -654,19 +672,18 @@ static bool ComputeTrackingToWorldTransformAndFrustum(
             TrackingCameraHHalfRadians= FMath::DegreesToRadians(TrackingCameraHFOVDegrees/2.f);
             TrackingCameraVHalfRadians= FMath::DegreesToRadians(TrackingCameraVFOVDegrees/2.f);
 
-            // Compute the Transform to go from Rift Tracking Space (in cm) to World Tracking Space (in unreal units)
-            TrackingSpaceToWorldSpace = 
-                // Convert from Right Handed (e.g., OpenGL, Oculus Rift native) to Unreal Left Handed coordinate system.
-                // Also scale cm to unreal units
+            // HMDToGameCameraRotation = Undo HMD orientation THEN apply game camera orientation
+            FQuat HMDToGameCameraRotation = GameCameraOrientation * HMDOrientation.Inverse();
+            FQuat TrackingCameraToGameRotation = HMDToGameCameraRotation * TrackingCameraOrientation;
+
+            // Compute the tracking camera location in world space
+            FVector TrackingCameraWorldSpaceOrigin =
+                HMDToGameCameraRotation.RotateVector(TrackingCameraOrigin) + GameCameraLocation;
+
+            // Compute the Transform to go from Rift Tracking Space (in unreal units) to World Tracking Space (in unreal units)
+            TrackingSpaceToWorldSpacePosition = 
                 RHSCMToUnrealUUTransform(LocalPlayer) *
-                // Put in the orientation of the game camera
-                FTransform(GameCameraOrientation) *
-                // Undo the orientation of the HMD
-                FTransform(HMDOrientation.Inverse()) *
-                // Put the tracking camera location in game camera space space
-                FTransform(TrackingCameraOrientation, TrackingCameraOrigin) *
-                // Offset by the game camera position to get to world space
-                FTransform(GameCameraLocation);
+                FTransform(TrackingCameraToGameRotation, TrackingCameraWorldSpaceOrigin);
         }
         else 
         {
@@ -685,9 +702,16 @@ static bool ComputeTrackingToWorldTransformAndFrustum(
             TrackingCameraFarPlane= k_default_tracking_far_plane_distance * MetersToUU;
 
             // Compute the Transform to go from Rift Tracking Space (in unreal units) to World Tracking Space (in unreal units)
-            TrackingSpaceToWorldSpace = RHSCMToUnrealUUTransform(LocalPlayer) *
-                                        FTransform(GameCameraOrientation, FakeTrackingCameraWorldSpaceOrigin);
+            TrackingSpaceToWorldSpacePosition = 
+                // Convert from Right Handed (e.g., OpenGL, Oculus Rift native) to Unreal Left Handed coordinate system.
+                // Also scale cm to unreal units
+                RHSCMToUnrealUUTransform(LocalPlayer) *
+                // Put in the orientation of the game camera
+                FTransform(GameCameraOrientation, FakeTrackingCameraWorldSpaceOrigin);
         }
+
+        // Transform the orientation of the controller from world space to camera space
+        OrientationTransform= GameCameraOrientation;
 
         success = true;
     }
@@ -699,15 +723,17 @@ static bool ComputeTrackingToWorldTransformAndFrustum(
 static void DrawDebugTrackingCameraFrustum()
 {
     const int32 PlayerIndex= 0;
-    FTransform TrackingSpaceToWorldSpace;
+    FTransform TrackingSpaceToWorldSpacePosition;
+    FQuat OrientationTransform;
     float TrackingCameraNearPlane; 
     float TrackingCameraFarPlane; 
     float TrackingCameraHHalfRadians;
     float TrackingCameraVHalfRadians;
 
-    if (ComputeTrackingToWorldTransformAndFrustum(
+    if (ComputeTrackingToWorldTransformsAndFrustum(
             PlayerIndex,
-            TrackingSpaceToWorldSpace,
+            TrackingSpaceToWorldSpacePosition,
+            OrientationTransform,
             TrackingCameraNearPlane, 
             TrackingCameraFarPlane, 
             TrackingCameraHHalfRadians, 
@@ -717,27 +743,38 @@ static void DrawDebugTrackingCameraFrustum()
 
         DrawDebugRHSTrackingCameraFrustum(
             LocalPlayer->GetWorld(), 
-            TrackingSpaceToWorldSpace, 
+            TrackingSpaceToWorldSpacePosition, 
             TrackingCameraNearPlane, 
             TrackingCameraFarPlane, 
             TrackingCameraHHalfRadians, 
             TrackingCameraVHalfRadians, 
             FColor::Yellow);
-        DrawDebugBasis(LocalPlayer->GetWorld(), TrackingSpaceToWorldSpace, 50.f); // 50 cm
+        DrawDebugBasis(LocalPlayer->GetWorld(), TrackingSpaceToWorldSpacePosition, 50.f); // 50 cm
     }
 }
 
 static void DrawDebugPSMoveWorldPosition(FPSMoveDataContext *DataContext)
 {
     const int32 PlayerIndex= 0;
-    FTransform TrackingSpaceToWorldSpace;
+    FTransform TrackingSpaceToWorldSpacePosition;
+    FQuat OrientationTransform;
 
-    if (ComputeTrackingToWorldTransform(PlayerIndex, TrackingSpaceToWorldSpace))
+    if (ComputeTrackingToWorldTransforms(
+            PlayerIndex, 
+            TrackingSpaceToWorldSpacePosition,
+            OrientationTransform))
     {
         ULocalPlayer* LocalPlayer = GEngine->FindFirstLocalPlayerFromControllerId(PlayerIndex);
-        FVector PSMoveInWorldSpace= TrackingSpaceToWorldSpace.TransformPosition(DataContext->GetPosition());
+        FVector PSMovePosInWorldSpace= TrackingSpaceToWorldSpacePosition.TransformPosition(DataContext->GetPosition());
+        
+        // The PSMove orientation is given in its native coordinate system
+        FQuat PSMOriNative = DataContext->GetOrientation();
+        // NOTE: Intentially backwards multiplication for quatertions
+        // Apply controller orientation first, then apply orientation transform
+        FQuat PSMOriWorld = OrientationTransform * PSMoveQuatToUnrealQuat(PSMOriNative);
 
-        DrawDebugSphere(LocalPlayer->GetWorld(), PSMoveInWorldSpace, 3.f, 15, FColor::White);
+        DrawDebugSphere(LocalPlayer->GetWorld(), PSMovePosInWorldSpace, 3.f, 15, FColor::White);
+        DrawDebugBasis(LocalPlayer->GetWorld(), FTransform(PSMOriWorld, PSMovePosInWorldSpace), 10.f); // 10 cm
     }
 }
 
