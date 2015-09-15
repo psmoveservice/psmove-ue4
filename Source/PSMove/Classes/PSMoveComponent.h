@@ -35,6 +35,9 @@ public:
 
     UFUNCTION(BlueprintCallable, Category = "PSMove")
     void CycleColours();
+    
+    UFUNCTION(BlueprintCallable, Category = "PSMove")
+    bool GetIsTracking();
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Debug)
     bool bShowHMDFrustumDebug;

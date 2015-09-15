@@ -77,3 +77,13 @@ void UPSMoveComponent::CycleColours()
         DataContextPtr->PostCycleColourRequest();
     }
 }
+
+bool UPSMoveComponent::GetIsTracking()
+{
+    bool isTracking = false;
+    if (DataContextPtr != nullptr)
+    {
+        isTracking = DataContextPtr->GetIsTracking();
+    }
+    return isTracking;
+}

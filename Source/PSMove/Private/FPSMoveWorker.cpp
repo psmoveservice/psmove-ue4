@@ -511,14 +511,16 @@ static void ControllerUpdatePositions(PSMoveTracker *psmove_tracker,
 {
     // Find the sphere position in the camera
     int found_sphere = 0;
-    
     {
         QUICK_SCOPE_CYCLE_COUNTER(Stat_FPSMoveWorker_TrackerUpdate)
         found_sphere = psmove_tracker_update(psmove_tracker, psmove);
     }
     
+    enum PSMoveTracker_Status curr_status =
+        psmove_tracker_get_status(psmove_tracker, psmove);
+    
     // Can we actually see the controller this frame?
-    controllerData->IsTracking = (found_sphere > 0);
+    controllerData->IsTracking = curr_status == Tracker_TRACKING;
 
     // Update the position of the controller
     if (controllerData->IsTracking)
