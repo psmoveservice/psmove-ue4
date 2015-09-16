@@ -86,7 +86,7 @@ FPSMoveWorker::FPSMoveWorker() :
     }
     
     // This Inits and Runs the thread.
-    Thread = FRunnableThread::Create(this, TEXT("FPSMoveWorker"), 0, TPri_Normal);
+    Thread = FRunnableThread::Create(this, TEXT("FPSMoveWorker"), 0, TPri_AboveNormal);
 }
 
 FPSMoveWorker::~FPSMoveWorker()
@@ -351,7 +351,7 @@ static bool TrackingContextSetup(TrackingContext *context)
         psmove_tracker_set_smoothing_settings(context->PSMoveTracker, &smoothing_settings);
 
         psmove_tracker_get_size(context->PSMoveTracker, &context->TrackerWidth, &context->TrackerHeight);
-        UE_LOG(LogPSMove, Log, TEXT("Camera Dimensions: %f x %f"), context->TrackerWidth, context->TrackerHeight);
+        UE_LOG(LogPSMove, Log, TEXT("Camera Dimensions: %d x %d"), context->TrackerWidth, context->TrackerHeight);
     }
     else
     {
