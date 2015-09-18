@@ -336,6 +336,8 @@ static bool TrackingContextSetup(TrackingContext *context)
         settings.exposure_mode = Exposure_LOW;
         settings.use_fitEllipse = 1;
         settings.camera_mirror = PSMove_True;
+        settings.color_save_colormapping = PSMove_False;
+        settings.color_list_start_ind = 2;  // Start with red
         context->PSMoveTracker = psmove_tracker_new_with_settings(&settings);
     }
     
