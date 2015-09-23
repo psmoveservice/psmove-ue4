@@ -1,6 +1,8 @@
 UE4Editor*
+UE4-*
 #Binaries/*
 .fuse*
+Intermediate/*
 
 # Compiled Object files
 *.slo
