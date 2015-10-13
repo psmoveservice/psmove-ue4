@@ -642,12 +642,16 @@ static bool ComputeTrackingToWorldTransformsAndFrustum(
     // Get the CameraManager for the primary player
     ULocalPlayer* LocalPlayer = GEngine->FindFirstLocalPlayerFromControllerId(PlayerIndex);
     APlayerCameraManager* GameCameraManager = UGameplayStatics::GetPlayerCameraManager(LocalPlayer, PlayerIndex);
+    APlayerController* PlayerController = UGameplayStatics::GetPlayerController(LocalPlayer, PlayerIndex);
 
     if (GameCameraManager != nullptr)
     {
         // Get the world game camera transform for the player
         FQuat GameCameraOrientation = GameCameraManager->GetCameraRotation().Quaternion();
         FVector GameCameraLocation = GameCameraManager->GetCameraLocation();
+
+        // Get the orientation of the pawn controlling the player
+        FRotator PlayerControllerRotation= PlayerController->GetControlRotation();
 
         if (GEngine->HMDDevice.IsValid() && GEngine->IsStereoscopic3D())
         {
@@ -684,6 +688,9 @@ static bool ComputeTrackingToWorldTransformsAndFrustum(
             TrackingSpaceToWorldSpacePosition = 
                 RHSCMToUnrealUUTransform(LocalPlayer) *
                 FTransform(TrackingCameraToGameRotation, TrackingCameraWorldSpaceOrigin);
+
+            // Transform the orientation of the controller from world space to pawn space
+            OrientationTransform= HMDToGameCameraRotation;
         }
         else 
         {
@@ -708,10 +715,10 @@ static bool ComputeTrackingToWorldTransformsAndFrustum(
                 RHSCMToUnrealUUTransform(LocalPlayer) *
                 // Put in the orientation of the game camera
                 FTransform(GameCameraOrientation, FakeTrackingCameraWorldSpaceOrigin);
-        }
 
-        // Transform the orientation of the controller from world space to camera space
-        OrientationTransform= GameCameraOrientation;
+            // Transform the orientation of the controller from world space to pawn space
+            OrientationTransform= PlayerControllerRotation.Quaternion();
+        }
 
         success = true;
     }
