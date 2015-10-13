@@ -86,7 +86,7 @@ FPSMoveWorker::FPSMoveWorker() :
     }
     
     // This Inits and Runs the thread.
-    Thread = FRunnableThread::Create(this, TEXT("FPSMoveWorker"), 0, TPri_Normal);
+    Thread = FRunnableThread::Create(this, TEXT("FPSMoveWorker"), 0, TPri_AboveNormal);
 }
 
 FPSMoveWorker::~FPSMoveWorker()
@@ -336,6 +336,8 @@ static bool TrackingContextSetup(TrackingContext *context)
         settings.exposure_mode = Exposure_LOW;
         settings.use_fitEllipse = 1;
         settings.camera_mirror = PSMove_True;
+        settings.color_save_colormapping = PSMove_False;
+        settings.color_list_start_ind = 3;  // Start with red
         context->PSMoveTracker = psmove_tracker_new_with_settings(&settings);
     }
     
@@ -351,7 +353,7 @@ static bool TrackingContextSetup(TrackingContext *context)
         psmove_tracker_set_smoothing_settings(context->PSMoveTracker, &smoothing_settings);
 
         psmove_tracker_get_size(context->PSMoveTracker, &context->TrackerWidth, &context->TrackerHeight);
-        UE_LOG(LogPSMove, Log, TEXT("Camera Dimensions: %f x %f"), context->TrackerWidth, context->TrackerHeight);
+        UE_LOG(LogPSMove, Log, TEXT("Camera Dimensions: %d x %d"), context->TrackerWidth, context->TrackerHeight);
     }
     else
     {
@@ -511,14 +513,16 @@ static void ControllerUpdatePositions(PSMoveTracker *psmove_tracker,
 {
     // Find the sphere position in the camera
     int found_sphere = 0;
-    
     {
         QUICK_SCOPE_CYCLE_COUNTER(Stat_FPSMoveWorker_TrackerUpdate)
         found_sphere = psmove_tracker_update(psmove_tracker, psmove);
     }
     
+    enum PSMoveTracker_Status curr_status =
+        psmove_tracker_get_status(psmove_tracker, psmove);
+    
     // Can we actually see the controller this frame?
-    controllerData->IsTracking = (found_sphere > 0);
+    controllerData->IsTracking = curr_status == Tracker_TRACKING;
 
     // Update the position of the controller
     if (controllerData->IsTracking)

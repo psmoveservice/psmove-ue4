@@ -10,6 +10,7 @@ UPSMoveComponent::UPSMoveComponent(const FObjectInitializer &init) : Super(init)
     PrimaryComponentTick.bCanEverTick = true;
 	PlayerIndex = 0;
 	Hand = EControllerHand::Right;
+    StartingColourIndex = 0;
 }
 
 // Called when the game starts
@@ -76,4 +77,14 @@ void UPSMoveComponent::CycleColours()
     {
         DataContextPtr->PostCycleColourRequest();
     }
+}
+
+bool UPSMoveComponent::GetIsTracking()
+{
+    bool isTracking = false;
+    if (DataContextPtr != nullptr)
+    {
+        isTracking = DataContextPtr->GetIsTracking();
+    }
+    return isTracking;
 }

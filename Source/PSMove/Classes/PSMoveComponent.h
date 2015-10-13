@@ -27,6 +27,9 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PSMove")
 	TEnumAsByte<EControllerHand> Hand;
 
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PSMove")
+    int32 StartingColourIndex;
+
     UFUNCTION(BlueprintCallable, Category = "PSMove")
     void ResetYaw();
 
@@ -35,13 +38,16 @@ public:
 
     UFUNCTION(BlueprintCallable, Category = "PSMove")
     void CycleColours();
+    
+    UFUNCTION(BlueprintCallable, Category = "PSMove")
+    bool GetIsTracking();
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Debug)
     bool bShowHMDFrustumDebug;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Debug)
     bool bShowTrackingDebug;
-    
+
 private:
     FPSMoveDataContext *DataContextPtr;
 };

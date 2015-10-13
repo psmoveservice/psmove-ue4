@@ -166,6 +166,9 @@ typedef struct {
     float color_update_quality_t2;              /* [0.2] maximum allowed change of the radius in percent, compared to the last estimated radius */
     float color_update_quality_t3;              /* [6.f] minimum radius */
 
+    enum PSMove_Bool color_save_colormapping;   /* [PSMove_True] whether or not to save the result of the color calibration to disk. */
+    int color_list_start_ind;                   /* [0] The index in [magenta, cyan, yellow, red, green/blue] to start searching for available color. */
+
     /* CBB-specific tracker parameters */
     float xorigin_cm;                           /* [0.f] x-distance to subtract from calculated position */
     float yorigin_cm;                           /* [0.f] y-distance to subtract from calculated position */
@@ -630,6 +633,20 @@ ADDCALL psmove_tracker_set_camera_color(PSMoveTracker *tracker, PSMove *move,
  **/
 ADDAPI int
 ADDCALL psmove_tracker_cycle_color(PSMoveTracker *tracker, PSMove *move);
+
+/**
+* \brief Set the sphere color to a default colour in the list.
+*
+* \param tracker A valid \ref PSMoveTracker handle
+* \param move A valid \ref PSMove handle
+* \param req_ind The indice of the requested color
+*
+* \return Nonzero if the color was successfully set, zero if
+*         if the controller is not enabled or calibration has not
+*         completed yet.
+**/
+ADDAPI int
+ADDCALL psmove_tracker_use_color_at_index(PSMoveTracker *tracker, PSMove *move, int req_ind);
 
 /**
  * \brief Query the tracking status of a motion controller
