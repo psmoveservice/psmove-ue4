@@ -139,6 +139,21 @@ ADDAPI float *
 ADDCALL psmove_fusion_get_modelview_matrix(PSMoveFusion *fusion, PSMove *move);
 
 /**
+* \brief Get a pointer to the 4x4 coregistration matrix
+*
+* This function returns the coregistration transform matrix
+* i.e. the matrix that converts from space of the psmove camera to 
+* another tracking camera.
+*
+* \param fusion A valid \ref PSMoveFusion handle
+*
+* \return A pointer to a 16-item (4x4) float array representing
+*         the coregistration matrix.
+**/
+ADDAPI float *
+ADDCALL psmove_fusion_get_coregistration_matrix(PSMoveFusion *fusion);
+
+/**
 * \brief Get a pointer to the 4x4 transform matrix
 *
 * This function returns the total transform matrix

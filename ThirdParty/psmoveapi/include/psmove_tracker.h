@@ -103,6 +103,14 @@ enum PSMoveTracker_Camera_type {
     PSMove_Camera_Unknown
 };
 
+/*! Known camera types. Used for calculating focal length when calibration not present. */
+enum PSMoveTracker_ErrorCode {
+    PSMove_Camera_Error_None,
+    PSMove_Camera_Not_Found,
+    PSMove_Camera_USB_Open_Failure,
+    PSMove_Camera_Query_Frame_Failure,
+};
+
 struct _PSMoveTrackerSmoothingSettings {
     // Low Pass Filter Options
     int filter_do_2d_xy;        /* [1] specifies to use a adaptive x/y smoothing on pixel location */
@@ -261,6 +269,14 @@ ADDCALL psmove_tracker_new_with_camera(int camera);
 **/
 ADDAPI PSMoveTracker *
 ADDCALL psmove_tracker_new_with_camera_and_settings(int camera, PSMoveTrackerSettings *settings);
+
+/**
+* \brief Get the last error posted by the tracker when the tracker initialized
+*
+* \return A \ref PSMoveTracker_ErrorCode result code
+**/
+ADDAPI enum PSMoveTracker_ErrorCode
+ADDCALL psmove_tracker_get_last_error();
 
 /**
  * \brief Instructs the PSMoveTracker to load its distortion settings from file.
