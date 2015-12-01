@@ -198,7 +198,7 @@ bool FPSMoveInternal::AcquirePSMove(int32 PlayerIndex, EControllerHand Hand, FPS
             //i.e. my_PSMoveComponent->DataContextPtr = &(my_FPSMoveSingleton.ControllerDataContexts[DataContextIndex])
             *OutDataContext = DataContext;
 
-            success= WorkerSingleton->AcquirePSMove(PlayerIndex, DataContext);
+			success = WorkerSingleton->AcquirePSMove(DataContextIndex, DataContext);
         }
     }
 
@@ -466,7 +466,7 @@ bool FPSMoveInputManager::GetControllerOrientationAndPosition(
     FRotator& OutOrientation, FVector& OutPosition) const
 {
     bool RetVal = false;
-    static int32 DataContextIndex= FPSMoveInternal::PlayerHandToDataContextIndex(PlayerIndex, DeviceHand);
+    int32 DataContextIndex= FPSMoveInternal::PlayerHandToDataContextIndex(PlayerIndex, DeviceHand);
     const FPSMoveDataContext *ControllerDataContext = PSMovePlugin->GetDataContextByIndex(DataContextIndex);
 
     if (ControllerDataContext != nullptr && ControllerDataContext->GetIsEnabled())
