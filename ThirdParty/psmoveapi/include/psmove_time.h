@@ -40,10 +40,14 @@ extern "C" {
 #endif
 
 #ifdef _MSC_VER
+
+// timespec is defined in MSVC 2015
+#ifndef TIME_UTC
 struct timespec {               /* definition per POSIX.4 */
 	time_t          tv_sec;         /* seconds */
 	long            tv_nsec;        /* and nanoseconds */
 };
+#endif // TIME_UTC
 
 typedef int64_t __int64_t;
 #endif // _MSC_VER
