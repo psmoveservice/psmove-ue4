@@ -4,7 +4,10 @@ Plugin for using PSMove as input into Unreal Engine 4.
 
 # Notes
 
-This plugin works in OS X and Windows 64-bit (I use 8.1 Pro).
+This plugin works in OS X and Windows 64-bit (I use 8.1 Pro) with Unreal Editor >= 4.10.
+This plugin provides an UE4-abstraction of
+a [a specific fork](https://github.com/cboulay/psmoveapi)
+of [psmoveapi](http://thp.io/2010/psmove/).
 
 Working features:
 
@@ -12,19 +15,8 @@ Working features:
 - Button presses trigger events.
 - Trigger-button value (0-255)
 - Set vibration (0-255)
+- Co-registration with Oculus Rift DK2
 
-Planned features:
-
-- Use TThreadSafeSharedPtr
-- Zeroing position and orientation
-- Co-registration with HMD
-
-Maybe someday features:
-
-- Optional 320x240 @ 140 Hz positional tracking
-- Hot-plugging
-- Controlling LEDs
-- Other camera types
 
 # Setup Hardware
 
