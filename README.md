@@ -1,3 +1,7 @@
+# OBSOLETE
+
+This plugin is currently obsolete. If you're using VR, then please use [PSMoveService](https://github.com/cboulay/PSMoveService) and its openvr driver. If you are using PSMove outside the context of VR, then please wait until we make a UE4 plugin based on PSMoveService.
+
 # psmove-ue4
 
 Plugin for using PSMove as input into Unreal Engine 4.
